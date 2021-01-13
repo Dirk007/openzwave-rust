@@ -13,4 +13,6 @@ keywords = ["zwave"]
 openzwave-sys = { path = "openzwave-sys", version = "0.1.1" }
 libc = "0.2"
 itertools = "0.4.11"
+log = { version = "0.4", features = [] }
+env_logger  = { version = "0.8", features = [] }
 
