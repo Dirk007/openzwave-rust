@@ -1,6 +1,6 @@
-extern crate gcc;
-use std::process::Command;
+extern crate cc;
 use std::env;
+use std::process::Command;
 
 #[cfg(target_os = "linux")]
 fn target_specific_work(_: &str) {
@@ -9,14 +9,17 @@ fn target_specific_work(_: &str) {
 }
 
 #[cfg(target_os = "macos")]
-fn target_specific_work(openzwave_build_dir: &str) {
+fn target_specific_work(_openzwave_build_dir: &str) {
     // The .a is a universal (fat) binary, so let's convert it to a thin binary
     // There is no easy way to disable the fat binary generation in open-zwave:
     // https://github.com/OpenZWave/open-zwave/issues/814
+    /*
     let exit_code = Command::new("lipo")
         .current_dir(openzwave_build_dir)
-        .arg("-thin").arg("x86_64")
-        .arg("-output").arg("libopenzwave-thin.a")
+        .arg("-thin")
+        .arg("x86_64")
+        .arg("-output")
+        .arg("libopenzwave-thin.a")
         .arg("libopenzwave.a")
         .status()
         .unwrap();
@@ -24,8 +27,12 @@ fn target_specific_work(openzwave_build_dir: &str) {
     if !exit_code.success() {
         panic!("Could not extract a thin library from the fat binary.");
     }
-
     println!("cargo:rustc-link-lib=static=openzwave-thin");
+    println!("cargo:rustc-link-lib=framework=IOKit");
+    println!("cargo:rustc-link-lib=framework=CoreFoundation");
+    */
+
+    println!("cargo:rustc-link-lib=static=openzwave");
     println!("cargo:rustc-link-lib=framework=IOKit");
     println!("cargo:rustc-link-lib=framework=CoreFoundation");
 }
@@ -42,7 +49,8 @@ fn make(output: &str) {
         .arg(format!("-j{}", env::var("NUM_JOBS").unwrap()))
         .env("top_builddir", output)
         .current_dir("open-zwave")
-        .status().unwrap();
+        .status()
+        .unwrap();
 
     if !exit_code.success() {
         panic!("Could not build the open-zwave library.");
@@ -57,15 +65,16 @@ fn main() {
     target_specific_work(&openzwave_build_dir);
 
     // then build our thin wrapper
-    let mut c = gcc::Config::new();
-    c.file("openzwave-c/options.cc")
-     .file("openzwave-c/manager.cc")
-     .file("openzwave-c/notification.cc")
-     .file("openzwave-c/value_classes/value_id.cc")
-     .cpp(true)
-     .flag("-std=c++11") // to iterate with ranges
-     .include("open-zwave/cpp/src")
-     .compile("libopenzwave-c.a");
+    let c = cc::Build::new()
+        .file("openzwave-c/options.cc")
+        .file("openzwave-c/manager.cc")
+        .file("openzwave-c/notification.cc")
+        .file("openzwave-c/value_classes/value_id.cc")
+        .cpp(true)
+        .flag("-std=c++17") // to iterate with ranges
+        .flag_if_supported("-Wno-unused-private-field")
+        .include("open-zwave/cpp/src")
+        .compile("libopenzwave-c.a");
 
     println!("cargo:rustc-link-search=native={}", openzwave_build_dir);
 }
