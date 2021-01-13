@@ -1,40 +1,39 @@
-use value_classes::value_id::ValueID;
 use libc::c_char;
 use utils::RustStringCreator;
+use value_classes::value_id::ValueID;
 
 #[derive(Debug, Eq, PartialEq)]
-#[repr(C)]
 pub enum NotificationType {
-    Type_ValueAdded = 0,
-    Type_ValueRemoved,
-    Type_ValueChanged,
-    Type_ValueRefreshed,
-    Type_Group,
-    Type_NodeNew,
-    Type_NodeAdded,
-    Type_NodeRemoved,
-    Type_NodeProtocolInfo,
-    Type_NodeNaming,
-    Type_NodeEvent,
-    Type_PollingDisabled,
-    Type_PollingEnabled,
-    Type_SceneEvent,
-    Type_CreateButton,
-    Type_DeleteButton,
-    Type_ButtonOn,
-    Type_ButtonOff,
-    Type_DriverReady,
-    Type_DriverFailed,
-    Type_DriverReset,
-    Type_EssentialNodeQueriesComplete,
-    Type_NodeQueriesComplete,
-    Type_AwakeNodesQueried,
-    Type_AllNodesQueriedSomeDead,
-    Type_AllNodesQueried,
-    Type_Notification,
-    Type_DriverRemoved,
-    Type_ControllerCommand,
-    Type_NodeReset
+    TypeValueAdded,
+    TypeValueRemoved,
+    TypeValueChanged,
+    TypeValueRefreshed,
+    TypeGroup,
+    TypeNodeNew,
+    TypeNodeAdded,
+    TypeNodeRemoved,
+    TypeNodeProtocolInfo,
+    TypeNodeNaming,
+    TypeNodeEvent,
+    TypePollingDisabled,
+    TypePollingEnabled,
+    TypeSceneEvent,
+    TypeCreateButton,
+    TypeDeleteButton,
+    TypeButtonOn,
+    TypeButtonOff,
+    TypeDriverReady,
+    TypeDriverFailed,
+    TypeDriverReset,
+    TypeEssentialNodeQueriesComplete,
+    TypeNodeQueriesComplete,
+    TypeAwakeNodesQueried,
+    TypeAllNodesQueriedSomeDead,
+    TypeAllNodesQueried,
+    TypeNotification,
+    TypeDriverRemoved,
+    TypeControllerCommand,
+    TypeNodeReset,
 }
 
 c_like_enum! {
@@ -103,8 +102,8 @@ impl fmt::Display for ControllerError {
 }
 
 pub enum Notification {}
-extern {
-    pub fn notification_get_type(notification: *const Notification) -> NotificationType;
+extern "C" {
+    pub fn notification_get_type(notification: *const Notification) -> u8;
     pub fn notification_get_home_id(notification: *const Notification) -> u32;
     pub fn notification_get_node_id(notification: *const Notification) -> u8;
     pub fn notification_get_value_id(notification: *const Notification) -> ValueID;
@@ -114,6 +113,8 @@ extern {
     pub fn notification_get_scene_id(notification: *const Notification) -> u8;
     pub fn notification_get_notification(notification: *const Notification) -> u8;
     pub fn notification_get_byte(notification: *const Notification) -> u8;
-    pub fn notification_get_as_string(notification: *const Notification, rust_string_creator: RustStringCreator) -> *const c_char;
+    pub fn notification_get_as_string(
+        notification: *const Notification,
+        rust_string_creator: RustStringCreator,
+    ) -> *const c_char;
 }
-

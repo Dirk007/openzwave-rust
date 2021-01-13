@@ -1,11 +1,11 @@
-use ffi::value_classes::value_id as extern_value_id;
+use error::{Error, GetSetError, Result};
 use ffi::manager as extern_manager;
 use ffi::utils::res_to_result;
-use libc::{ c_char, c_void };
+use ffi::value_classes::value_id as extern_value_id;
+use libc::{c_char, c_void};
 use std::ffi::CString;
-use std::ptr;
 use std::fmt;
-use error::{ Error, GetSetError, Result };
+use std::ptr;
 
 pub use ffi::value_classes::value_id::{ValueGenre, ValueType};
 
@@ -106,15 +106,14 @@ impl fmt::Display for CommandClass {
     }
 }
 
+use controller::Controller;
 use ffi::utils::{
-    rust_string_creator, rust_vec_creator, rust_string_vec_creator,
-    recover_string, recover_vec
+    recover_string, recover_vec, rust_string_creator, rust_string_vec_creator, rust_vec_creator,
 };
 use node::Node;
-use controller::Controller;
 
 pub struct ValueList<'a> {
-    value_id: &'a ValueID
+    value_id: &'a ValueID,
 }
 
 impl<'a> ValueList<'a> {
@@ -123,28 +122,54 @@ impl<'a> ValueList<'a> {
         let mut raw_string: *mut c_char = ptr::null_mut();
 
         let res = unsafe {
-            extern_manager::get_value_list_selection_as_string(manager_ptr, &self.value_id.as_ozw_vid(), &mut raw_string, rust_string_creator)
+            extern_manager::get_value_list_selection_as_string(
+                manager_ptr,
+                &self.value_id.as_ozw_vid(),
+                &mut raw_string,
+                rust_string_creator,
+            )
         };
 
         if res {
             Ok(recover_string(raw_string))
         } else {
-            Err(Error::GetError(GetSetError::APIError("ValueList::selection_as_string")))
+            Err(Error::GetError(GetSetError::APIError(
+                "ValueList::selection_as_string",
+            )))
         }
     }
 
     pub fn selection_as_int(&self) -> Result<i32> {
         let manager_ptr = unsafe { extern_manager::get() };
         let mut val: i32 = 0;
-        let res = unsafe { extern_manager::get_value_list_selection_as_int(manager_ptr, &self.value_id.as_ozw_vid(), &mut val) };
-        if res { Ok(val) } else { Err(Error::GetError(GetSetError::APIError("ValueList::selection_as_int"))) }
+        let res = unsafe {
+            extern_manager::get_value_list_selection_as_int(
+                manager_ptr,
+                &self.value_id.as_ozw_vid(),
+                &mut val,
+            )
+        };
+        if res {
+            Ok(val)
+        } else {
+            Err(Error::GetError(GetSetError::APIError(
+                "ValueList::selection_as_int",
+            )))
+        }
     }
 
     pub fn items(&self) -> Result<Box<Vec<String>>> {
         let manager_ptr = unsafe { extern_manager::get() };
         let mut c_items: *mut Vec<String> = ptr::null_mut();
         let c_items_void_ptr = &mut c_items as *mut *mut _ as *mut *mut c_void;
-        let res = unsafe { extern_manager::get_value_list_items(manager_ptr, &self.value_id.as_ozw_vid(), c_items_void_ptr, rust_string_vec_creator) };
+        let res = unsafe {
+            extern_manager::get_value_list_items(
+                manager_ptr,
+                &self.value_id.as_ozw_vid(),
+                c_items_void_ptr,
+                rust_string_vec_creator,
+            )
+        };
         if res {
             Ok(recover_vec(c_items))
         } else {
@@ -156,7 +181,14 @@ impl<'a> ValueList<'a> {
         let manager_ptr = unsafe { extern_manager::get() };
         let mut c_values: *mut Vec<i32> = ptr::null_mut();
         let c_values_void_ptr = &mut c_values as *mut *mut _ as *mut *mut c_void;
-        let res = unsafe { extern_manager::get_value_list_values(manager_ptr, &self.value_id.as_ozw_vid(), c_values_void_ptr, rust_vec_creator::<i32>) };
+        let res = unsafe {
+            extern_manager::get_value_list_values(
+                manager_ptr,
+                &self.value_id.as_ozw_vid(),
+                c_values_void_ptr,
+                rust_vec_creator::<i32>,
+            )
+        };
         if res {
             Ok(recover_vec(c_values))
         } else {
@@ -179,37 +211,44 @@ impl<'a> fmt::Debug for ValueList<'a> {
 #[derive(Eq, PartialEq, Clone, Copy, Hash)]
 pub struct ValueID {
     home_id: u32,
-    id: u64
+    id: u64,
 }
 
 impl ValueID {
     pub fn from_packed_id(home_id: u32, id: u64) -> ValueID {
-        ValueID { home_id: home_id, id: id }
+        ValueID {
+            home_id: home_id,
+            id: id,
+        }
     }
 
     pub fn as_ozw_vid(&self) -> extern_value_id::ValueID {
         unsafe { extern_value_id::value_id_from_packed_id(self.home_id, self.id) }
     }
 
-    pub fn from_values(home_id: u32,
-                       node_id: u8,
-                       genre: ValueGenre,
-                       command_class_id: u8,
-                       instance: u8,
-                       value_index: u8,
-                       value_type: ValueType) -> ValueID {
+    pub fn from_values(
+        home_id: u32,
+        node_id: u8,
+        genre: ValueGenre,
+        command_class_id: u8,
+        instance: u8,
+        value_index: u8,
+        value_type: ValueType,
+    ) -> ValueID {
         let ozw_vid = unsafe {
-            extern_value_id::value_id_from_values(home_id,
-                                                  node_id,
-                                                  genre,
-                                                  command_class_id,
-                                                  instance,
-                                                  value_index,
-                                                  value_type)
+            extern_value_id::value_id_from_values(
+                home_id,
+                node_id,
+                genre,
+                command_class_id,
+                instance,
+                value_index,
+                value_type,
+            )
         };
         ValueID {
             home_id: unsafe { extern_value_id::value_id_get_home_id(&ozw_vid) },
-            id: unsafe { extern_value_id::value_id_get_id(&ozw_vid) }
+            id: unsafe { extern_value_id::value_id_get_id(&ozw_vid) },
         }
     }
 
@@ -261,66 +300,104 @@ impl ValueID {
     pub fn as_bool(&self) -> Result<bool> {
         match self.get_type() {
             // The underlying library returns a value for both bool and button types.
-            ValueType::ValueType_Bool | ValueType::ValueType_Button => {
+            ValueType::Bool | ValueType::Button => {
                 let manager_ptr = unsafe { extern_manager::get() };
                 let mut val: bool = false;
-                let res = unsafe { extern_manager::get_value_as_bool(manager_ptr, &self.as_ozw_vid(), &mut val) };
-                if res { Ok(val) } else { Err(Error::GetError(GetSetError::APIError("as_bool"))) }
-            },
-            _ => Err(Error::GetError(GetSetError::WrongType))
+                let res = unsafe {
+                    extern_manager::get_value_as_bool(manager_ptr, &self.as_ozw_vid(), &mut val)
+                };
+                if res {
+                    Ok(val)
+                } else {
+                    Err(Error::GetError(GetSetError::APIError("as_bool")))
+                }
+            }
+            _ => Err(Error::GetError(GetSetError::WrongType)),
         }
     }
 
     pub fn as_byte(&self) -> Result<u8> {
-        if self.get_type() == ValueType::ValueType_Byte {
+        if self.get_type() == ValueType::Byte {
             let manager_ptr = unsafe { extern_manager::get() };
             let mut val: u8 = 0;
-            let res = unsafe { extern_manager::get_value_as_byte(manager_ptr, &self.as_ozw_vid(), &mut val) };
-            if res { Ok(val) } else { Err(Error::GetError(GetSetError::APIError("as_byte"))) }
+            let res = unsafe {
+                extern_manager::get_value_as_byte(manager_ptr, &self.as_ozw_vid(), &mut val)
+            };
+            if res {
+                Ok(val)
+            } else {
+                Err(Error::GetError(GetSetError::APIError("as_byte")))
+            }
         } else {
             Err(Error::GetError(GetSetError::WrongType))
         }
     }
 
     pub fn as_float(&self) -> Result<f32> {
-        if self.get_type() == ValueType::ValueType_Decimal {
+        if self.get_type() == ValueType::Decimal {
             let manager_ptr = unsafe { extern_manager::get() };
             let mut val: f32 = 0.;
-            let res = unsafe { extern_manager::get_value_as_float(manager_ptr, &self.as_ozw_vid(), &mut val) };
-            if res { Ok(val) } else { Err(Error::GetError(GetSetError::APIError("as_float"))) }
+            let res = unsafe {
+                extern_manager::get_value_as_float(manager_ptr, &self.as_ozw_vid(), &mut val)
+            };
+            if res {
+                Ok(val)
+            } else {
+                Err(Error::GetError(GetSetError::APIError("as_float")))
+            }
         } else {
             Err(Error::GetError(GetSetError::WrongType))
         }
     }
 
     pub fn get_float_precision(&self) -> Result<u8> {
-        if self.get_type() == ValueType::ValueType_Decimal {
+        if self.get_type() == ValueType::Decimal {
             let manager_ptr = unsafe { extern_manager::get() };
             let mut val: u8 = 0;
-            let res = unsafe { extern_manager::get_value_float_precision(manager_ptr, &self.as_ozw_vid(), &mut val) };
-            if res { Ok(val) } else { Err(Error::GetError(GetSetError::APIError("get_float_precision"))) }
+            let res = unsafe {
+                extern_manager::get_value_float_precision(manager_ptr, &self.as_ozw_vid(), &mut val)
+            };
+            if res {
+                Ok(val)
+            } else {
+                Err(Error::GetError(GetSetError::APIError(
+                    "get_float_precision",
+                )))
+            }
         } else {
             Err(Error::GetError(GetSetError::WrongType))
         }
     }
 
     pub fn as_int(&self) -> Result<i32> {
-        if self.get_type() == ValueType::ValueType_Int {
+        if self.get_type() == ValueType::Int {
             let manager_ptr = unsafe { extern_manager::get() };
             let mut val: i32 = 0;
-            let res = unsafe { extern_manager::get_value_as_int(manager_ptr, &self.as_ozw_vid(), &mut val) };
-            if res { Ok(val) } else { Err(Error::GetError(GetSetError::APIError("as_int"))) }
+            let res = unsafe {
+                extern_manager::get_value_as_int(manager_ptr, &self.as_ozw_vid(), &mut val)
+            };
+            if res {
+                Ok(val)
+            } else {
+                Err(Error::GetError(GetSetError::APIError("as_int")))
+            }
         } else {
             Err(Error::GetError(GetSetError::WrongType))
         }
     }
 
     pub fn as_short(&self) -> Result<i16> {
-        if self.get_type() == ValueType::ValueType_Short {
+        if self.get_type() == ValueType::Short {
             let manager_ptr = unsafe { extern_manager::get() };
             let mut val: i16 = 0;
-            let res = unsafe { extern_manager::get_value_as_short(manager_ptr, &self.as_ozw_vid(), &mut val) };
-            if res { Ok(val) } else { Err(Error::GetError(GetSetError::APIError("as_short"))) }
+            let res = unsafe {
+                extern_manager::get_value_as_short(manager_ptr, &self.as_ozw_vid(), &mut val)
+            };
+            if res {
+                Ok(val)
+            } else {
+                Err(Error::GetError(GetSetError::APIError("as_short")))
+            }
         } else {
             Err(Error::GetError(GetSetError::WrongType))
         }
@@ -332,7 +409,12 @@ impl ValueID {
         let mut raw_string: *mut c_char = ptr::null_mut();
 
         let res = unsafe {
-            extern_manager::get_value_as_string(manager_ptr, &self.as_ozw_vid(), &mut raw_string, rust_string_creator)
+            extern_manager::get_value_as_string(
+                manager_ptr,
+                &self.as_ozw_vid(),
+                &mut raw_string,
+                rust_string_creator,
+            )
         };
 
         if res {
@@ -343,12 +425,19 @@ impl ValueID {
     }
 
     pub fn as_raw(&self) -> Result<Box<Vec<u8>>> {
-        if self.get_type() == ValueType::ValueType_Raw {
+        if self.get_type() == ValueType::Raw {
             let mut raw_ptr: *mut Vec<u8> = ptr::null_mut();
             let raw_ptr_c_void = &mut raw_ptr as *mut *mut _ as *mut *mut c_void;
 
             let manager_ptr = unsafe { extern_manager::get() };
-            let res = unsafe { extern_manager::get_value_as_raw(manager_ptr, &self.as_ozw_vid(), raw_ptr_c_void, rust_vec_creator::<u8>) };
+            let res = unsafe {
+                extern_manager::get_value_as_raw(
+                    manager_ptr,
+                    &self.as_ozw_vid(),
+                    raw_ptr_c_void,
+                    rust_vec_creator::<u8>,
+                )
+            };
 
             if res {
                 Ok(recover_vec(raw_ptr))
@@ -361,7 +450,7 @@ impl ValueID {
     }
 
     pub fn as_list(&self) -> Result<ValueList> {
-        if self.get_type() == ValueType::ValueType_List {
+        if self.get_type() == ValueType::List {
             Ok(ValueList { value_id: self })
         } else {
             Err(Error::GetError(GetSetError::WrongType))
@@ -370,55 +459,60 @@ impl ValueID {
 
     pub fn set_bool(&self, value: bool) -> Result<()> {
         match self.get_type() {
-            ValueType::ValueType_Bool | ValueType::ValueType_Button => {
+            ValueType::Bool | ValueType::Button => {
                 let manager_ptr = unsafe { extern_manager::get() };
                 res_to_result(unsafe {
                     extern_manager::set_value_bool(manager_ptr, &self.as_ozw_vid(), value)
-                }).or(Err(Error::SetError(GetSetError::APIError("set_bool"))))
+                })
+                .or(Err(Error::SetError(GetSetError::APIError("set_bool"))))
             }
-            _ => Err(Error::SetError(GetSetError::WrongType))
+            _ => Err(Error::SetError(GetSetError::WrongType)),
         }
     }
 
     pub fn set_byte(&self, value: u8) -> Result<()> {
-        if self.get_type() == ValueType::ValueType_Byte {
+        if self.get_type() == ValueType::Byte {
             let manager_ptr = unsafe { extern_manager::get() };
             res_to_result(unsafe {
                 extern_manager::set_value_byte(manager_ptr, &self.as_ozw_vid(), value)
-            }).or(Err(Error::SetError(GetSetError::APIError("set_byte"))))
+            })
+            .or(Err(Error::SetError(GetSetError::APIError("set_byte"))))
         } else {
             Err(Error::SetError(GetSetError::WrongType))
         }
     }
 
     pub fn set_float(&self, value: f32) -> Result<()> {
-        if self.get_type() == ValueType::ValueType_Decimal {
+        if self.get_type() == ValueType::Decimal {
             let manager_ptr = unsafe { extern_manager::get() };
             res_to_result(unsafe {
                 extern_manager::set_value_float(manager_ptr, &self.as_ozw_vid(), value)
-            }).or(Err(Error::SetError(GetSetError::APIError("set_float"))))
+            })
+            .or(Err(Error::SetError(GetSetError::APIError("set_float"))))
         } else {
             Err(Error::SetError(GetSetError::WrongType))
         }
     }
 
     pub fn set_int(&self, value: i32) -> Result<()> {
-        if self.get_type() == ValueType::ValueType_Int {
+        if self.get_type() == ValueType::Int {
             let manager_ptr = unsafe { extern_manager::get() };
             res_to_result(unsafe {
                 extern_manager::set_value_int(manager_ptr, &self.as_ozw_vid(), value)
-            }).or(Err(Error::SetError(GetSetError::APIError("set_int"))))
+            })
+            .or(Err(Error::SetError(GetSetError::APIError("set_int"))))
         } else {
             Err(Error::SetError(GetSetError::WrongType))
         }
     }
 
     pub fn set_short(&self, value: i16) -> Result<()> {
-        if self.get_type() == ValueType::ValueType_Short {
+        if self.get_type() == ValueType::Short {
             let manager_ptr = unsafe { extern_manager::get() };
             res_to_result(unsafe {
                 extern_manager::set_value_short(manager_ptr, &self.as_ozw_vid(), value)
-            }).or(Err(Error::SetError(GetSetError::APIError("set_short"))))
+            })
+            .or(Err(Error::SetError(GetSetError::APIError("set_short"))))
         } else {
             Err(Error::SetError(GetSetError::WrongType))
         }
@@ -427,84 +521,92 @@ impl ValueID {
     pub fn set_string(&self, value: &str) -> Result<()> {
         // The underlying C++ lib accepts strings for all types
         let manager_ptr = unsafe { extern_manager::get() };
-        let c_string = try!(CString::new(value));
+        let c_string = CString::new(value)?;
         res_to_result(unsafe {
             extern_manager::set_value_string(manager_ptr, &self.as_ozw_vid(), c_string.as_ptr())
-        }).or(Err(Error::SetError(GetSetError::APIError("set_string"))))
+        })
+        .or(Err(Error::SetError(GetSetError::APIError("set_string"))))
     }
 
     pub fn set_raw(&self, value: &Vec<u8>) -> Result<()> {
-        if self.get_type() == ValueType::ValueType_Raw && value.len() < 256 {
+        if self.get_type() == ValueType::Raw && value.len() < 256 {
             let manager_ptr = unsafe { extern_manager::get() };
             res_to_result(unsafe {
-                extern_manager::set_value_raw(manager_ptr, &self.as_ozw_vid(), value.as_ptr(), value.len() as u8)
-            }).or(Err(Error::SetError(GetSetError::APIError("set_raw"))))
+                extern_manager::set_value_raw(
+                    manager_ptr,
+                    &self.as_ozw_vid(),
+                    value.as_ptr(),
+                    value.len() as u8,
+                )
+            })
+            .or(Err(Error::SetError(GetSetError::APIError("set_raw"))))
         } else {
             Err(Error::SetError(GetSetError::WrongType))
         }
     }
 
     pub fn set_list_selection_string(&self, value: &str) -> Result<()> {
-        if self.get_type() == ValueType::ValueType_List {
-            let c_string = try!(CString::new(value));
+        if self.get_type() == ValueType::List {
+            let c_string = CString::new(value)?;
             let manager_ptr = unsafe { extern_manager::get() };
             res_to_result(unsafe {
-                extern_manager::set_value_list_selection_string(manager_ptr, &self.as_ozw_vid(), c_string.as_ptr())
-            }).or(Err(Error::SetError(GetSetError::APIError("set_list_selection_string"))))
+                extern_manager::set_value_list_selection_string(
+                    manager_ptr,
+                    &self.as_ozw_vid(),
+                    c_string.as_ptr(),
+                )
+            })
+            .or(Err(Error::SetError(GetSetError::APIError(
+                "set_list_selection_string",
+            ))))
         } else {
             Err(Error::SetError(GetSetError::WrongType))
         }
     }
 
     pub fn get_label(&self) -> String {
-        recover_string(
-            unsafe {
-                let manager_ptr = extern_manager::get();
-                extern_manager::get_value_label(manager_ptr, &self.as_ozw_vid(), rust_string_creator)
-            }
-        )
+        recover_string(unsafe {
+            let manager_ptr = extern_manager::get();
+            extern_manager::get_value_label(manager_ptr, &self.as_ozw_vid(), rust_string_creator)
+        })
     }
 
     pub fn set_label(&self, str: &str) -> Result<()> {
         unsafe {
             let manager_ptr = extern_manager::get();
-            let c_string = try!(CString::new(str)).as_ptr();
+            let c_string = CString::new(str)?.as_ptr();
             extern_manager::set_value_label(manager_ptr, &self.as_ozw_vid(), c_string);
             Ok(())
         }
     }
 
     pub fn get_units(&self) -> String {
-        recover_string(
-            unsafe {
-                let manager_ptr = extern_manager::get();
-                extern_manager::get_value_units(manager_ptr, &self.as_ozw_vid(), rust_string_creator)
-            }
-        )
+        recover_string(unsafe {
+            let manager_ptr = extern_manager::get();
+            extern_manager::get_value_units(manager_ptr, &self.as_ozw_vid(), rust_string_creator)
+        })
     }
 
-    pub fn set_units(&self, str: &str) -> Result<()>  {
+    pub fn set_units(&self, str: &str) -> Result<()> {
         unsafe {
             let manager_ptr = extern_manager::get();
-            let c_string = try!(CString::new(str)).as_ptr();
+            let c_string = CString::new(str)?.as_ptr();
             extern_manager::set_value_units(manager_ptr, &self.as_ozw_vid(), c_string);
             Ok(())
         }
     }
 
     pub fn get_help(&self) -> String {
-        recover_string(
-            unsafe {
-                let manager_ptr = extern_manager::get();
-                extern_manager::get_value_help(manager_ptr, &self.as_ozw_vid(), rust_string_creator)
-            }
-        )
+        recover_string(unsafe {
+            let manager_ptr = extern_manager::get();
+            extern_manager::get_value_help(manager_ptr, &self.as_ozw_vid(), rust_string_creator)
+        })
     }
 
     pub fn set_help(&self, str: &str) -> Result<()> {
         unsafe {
             let manager_ptr = extern_manager::get();
-            let c_string = try!(CString::new(str)).as_ptr();
+            let c_string = CString::new(str)?.as_ptr();
             extern_manager::set_value_help(manager_ptr, &self.as_ozw_vid(), c_string);
             Ok(())
         }
@@ -561,7 +663,13 @@ impl fmt::Display for ValueID {
             node_name = node.get_product_name();
         }
 
-        let read_write = if self.is_read_only() { "R" } else if self.is_write_only() { "W" } else { "RW" };
+        let read_write = if self.is_read_only() {
+            "R"
+        } else if self.is_write_only() {
+            "W"
+        } else {
+            "RW"
+        };
 
         f.pad(&format!("HomeId: {:08x} ID: {:016x} NodeId: {:3} {:30} CC: ({:3}) {:20} Type: {:8} Label: {:20} Value: {:8} ({})",
                        self.get_home_id(),
@@ -623,7 +731,8 @@ use std::cmp::{self, Ordering};
 
 impl cmp::PartialOrd for ValueID {
     fn partial_cmp(&self, other: &ValueID) -> Option<Ordering> {
-        let is_less_than = unsafe { extern_value_id::value_id_less_than(&self.as_ozw_vid(), &other.as_ozw_vid()) };
+        let is_less_than =
+            unsafe { extern_value_id::value_id_less_than(&self.as_ozw_vid(), &other.as_ozw_vid()) };
         if is_less_than {
             Some(Ordering::Less)
         } else if self.eq(other) {

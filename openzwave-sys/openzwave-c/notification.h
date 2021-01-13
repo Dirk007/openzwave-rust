@@ -11,7 +11,7 @@ typedef OpenZWave::ValueID ValueID;
 typedef Notification::NotificationType NotificationType;
 typedef Notification::NotificationCode NotificationCode;
 
-NotificationType notification_get_type(const Notification *);
+uint8_t notification_get_type(const Notification *);
 
 uint32 notification_get_home_id(const Notification *);
 

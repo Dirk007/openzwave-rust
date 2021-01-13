@@ -2,8 +2,8 @@
 
 extern "C" {
 
-  NotificationType notification_get_type(const Notification * notification) {
-    return notification->GetType();
+  uint8_t notification_get_type(const Notification * notification) {
+    return static_cast<uint8_t>(notification->GetType());
   }
 
   uint32 notification_get_home_id(const Notification * notification) {

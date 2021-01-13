@@ -1,16 +1,17 @@
+use error::{Error, Result};
+use ffi::manager as extern_manager;
 use ffi::utils::res_to_result;
 use libc::c_void;
-use std::ffi::CString;
-use notification::{Notification, ExternNotification};
+use notification::{ExternNotification, Notification};
 use options::Options;
-use ffi::manager as extern_manager;
+use std::ffi::CString;
 use value_classes::value_id::ValueID;
-use error::{ Error, Result };
 
+#[allow(unused)]
 pub struct Manager {
     pub ptr: *mut extern_manager::Manager,
     options: Options,
-    watchers: Vec<Option<Box<WatcherWrapper>>>
+    watchers: Vec<Option<Box<WatcherWrapper>>>,
 }
 
 unsafe impl Send for Manager {}
@@ -20,20 +21,34 @@ pub trait NotificationWatcher: Sync {
     fn on_notification(&self, &Notification);
 }
 
+#[allow(unused)]
 struct WatcherWrapper {
-    watcher: Box<NotificationWatcher>
+    watcher: Box<NotificationWatcher>,
 }
 
 // watcher is actually a Box<WatcherWrapper>
 extern "C" fn watcher_cb(notification: *const ExternNotification, watcher: *const c_void) {
+    log::info!(
+        "watcher_cb -> notification ptr = {:?} - start",
+        notification
+    );
     let watcher_wrapper: &WatcherWrapper = unsafe { &*(watcher as *const WatcherWrapper) };
-    let notification = Notification::new(notification);
-    watcher_wrapper.watcher.on_notification(&notification);
+    log::info!(
+        "watcher_cb -> notification ptr = {:?} - convert",
+        notification
+    );
+    let rust_notification = Notification::new(notification);
+    log::info!(
+        "watcher_cb -> notification converted ({:?})",
+        rust_notification
+    );
+    // log::info!("watcher_cb -> {:?}", rust_notification.notification_type);
+    //watcher_wrapper.watcher.on_notification(&notification);
 }
 
 impl Manager {
     pub fn create(mut options: Options) -> Result<Manager> {
-        try!(options.lock());
+        options.lock()?;
         let external_manager = unsafe { extern_manager::manager_create() };
         if external_manager.is_null() {
             Err(Error::OptionsAreNotLocked("Manager::create"))
@@ -41,7 +56,7 @@ impl Manager {
             Ok(Manager {
                 ptr: external_manager,
                 options: options,
-                watchers: Vec::with_capacity(1)
+                watchers: Vec::with_capacity(1),
             })
         }
     }
@@ -57,56 +72,58 @@ impl Manager {
     }
     */
 
-    pub fn add_node(&self, home_id:u32, secure: bool) -> Result<()> {
-        res_to_result(unsafe {
-            extern_manager::manager_add_node(self.ptr, home_id, secure)
-        }).or(Err(Error::InvalidParameter("home_id", "Manager::add_node")))
+    pub fn add_node(&self, home_id: u32, secure: bool) -> Result<()> {
+        res_to_result(unsafe { extern_manager::manager_add_node(self.ptr, home_id, secure) })
+            .or(Err(Error::InvalidParameter("home_id", "Manager::add_node")))
     }
 
-    pub fn remove_node(&self, home_id:u32) -> Result<()> {
-        res_to_result(unsafe {
-            extern_manager::manager_remove_node(self.ptr, home_id)
-        }).or(Err(Error::InvalidParameter("home_id", "Manager::remove_node")))
+    pub fn remove_node(&self, home_id: u32) -> Result<()> {
+        res_to_result(unsafe { extern_manager::manager_remove_node(self.ptr, home_id) }).or(Err(
+            Error::InvalidParameter("home_id", "Manager::remove_node"),
+        ))
     }
 
-    pub fn test_network(&self, home_id:u32, count:u32) {
+    pub fn test_network(&self, home_id: u32, count: u32) {
         unsafe {
             extern_manager::test_network(self.ptr, home_id, count);
         }
     }
 
-    pub fn test_network_node(&self, home_id:u32, node_id:u8, count:u32) {
+    pub fn test_network_node(&self, home_id: u32, node_id: u8, count: u32) {
         unsafe {
             extern_manager::test_network_node(self.ptr, home_id, node_id, count);
         }
     }
 
-    pub fn heal_network(&self, home_id:u32, do_rr:bool) {
+    pub fn heal_network(&self, home_id: u32, do_rr: bool) {
         unsafe {
             extern_manager::heal_network(self.ptr, home_id, do_rr);
         }
     }
 
-    pub fn heal_network_node(&self, home_id:u32, node_id:u8, do_rr:bool) {
+    pub fn heal_network_node(&self, home_id: u32, node_id: u8, do_rr: bool) {
         unsafe {
             extern_manager::heal_network_node(self.ptr, home_id, node_id, do_rr);
         }
     }
 
     pub fn add_watcher<T: 'static + NotificationWatcher>(&mut self, watcher: T) -> Result<usize> {
-        let watcher_wrapper = Box::new(WatcherWrapper { watcher: Box::new(watcher) });
+        let watcher_wrapper = Box::new(WatcherWrapper {
+            watcher: Box::new(watcher),
+        });
 
         let watcher_ptr: *const c_void = &*watcher_wrapper as *const _ as *const c_void;
-        let api_res = unsafe {
-            extern_manager::manager_add_watcher(self.ptr, watcher_cb, watcher_ptr)
-        };
+        let api_res =
+            unsafe { extern_manager::manager_add_watcher(self.ptr, watcher_cb, watcher_ptr) };
 
         if api_res {
             let position = self.watchers.len();
             self.watchers.push(Some(watcher_wrapper));
             Ok(position)
         } else {
-            Err(Error::APIError("Could not add a watcher: it's already added"))
+            Err(Error::APIError(
+                "Could not add a watcher: it's already added",
+            ))
         }
     }
 
@@ -129,41 +146,58 @@ impl Manager {
         let watcher_ptr: *mut c_void = wrapper as *mut _ as *mut c_void;
         res_to_result(unsafe {
             extern_manager::manager_remove_watcher(self.ptr, watcher_cb, watcher_ptr)
-        }).or(Err(Error::APIError("Could not remove a watcher as it was not added or already removed")))
+        })
+        .or(Err(Error::APIError(
+            "Could not remove a watcher as it was not added or already removed",
+        )))
     }
 
     pub fn add_driver(&mut self, device: &str) -> Result<()> {
         let device = CString::new(device).unwrap();
         res_to_result(unsafe {
-            extern_manager::manager_add_driver(self.ptr, device.as_ptr(), &extern_manager::ControllerInterface::ControllerInterface_Serial)
-        }).or(Err(Error::APIError("Could not add the driver as it is already added")))
+            extern_manager::manager_add_driver(
+                self.ptr,
+                device.as_ptr(),
+                &extern_manager::ControllerInterface::Serial,
+            )
+        })
+        .or(Err(Error::APIError(
+            "Could not add the driver as it is already added",
+        )))
     }
 
     pub fn add_usb_driver(&mut self) -> Result<()> {
         let device = CString::new("HID Controller").unwrap();
         res_to_result(unsafe {
-            extern_manager::manager_add_driver(self.ptr, device.as_ptr(), &extern_manager::ControllerInterface::ControllerInterface_Hid)
-        }).or(Err(Error::APIError("Could not add the driver as it is already added")))
+            extern_manager::manager_add_driver(
+                self.ptr,
+                device.as_ptr(),
+                &extern_manager::ControllerInterface::Hid,
+            )
+        })
+        .or(Err(Error::APIError(
+            "Could not add the driver as it is already added",
+        )))
     }
 
     pub fn remove_driver(&mut self, device: &str) -> Result<()> {
         let device = CString::new(device).unwrap();
-        res_to_result(unsafe {
-            extern_manager::manager_remove_driver(self.ptr, device.as_ptr())
-        }).or(Err(Error::APIError("Could not remove the driver as it was not added or already removed")))
+        res_to_result(unsafe { extern_manager::manager_remove_driver(self.ptr, device.as_ptr()) })
+            .or(Err(Error::APIError(
+                "Could not remove the driver as it was not added or already removed",
+            )))
     }
 
     pub fn remove_usb_driver(&mut self) -> Result<()> {
         let device = CString::new("HID Controller").unwrap();
-        res_to_result(unsafe {
-            extern_manager::manager_remove_driver(self.ptr, device.as_ptr())
-        }).or(Err(Error::APIError("Could not remove the driver as it was not added or already removed")))
+        res_to_result(unsafe { extern_manager::manager_remove_driver(self.ptr, device.as_ptr()) })
+            .or(Err(Error::APIError(
+                "Could not remove the driver as it was not added or already removed",
+            )))
     }
 
     pub fn get_poll_interval(&self) -> i32 {
-        unsafe {
-            extern_manager::manager_get_poll_interval(self.ptr)
-        }
+        unsafe { extern_manager::manager_get_poll_interval(self.ptr) }
     }
 
     pub fn set_poll_interval(&self, interval_ms: i32, is_between_each_poll: bool) {
@@ -174,26 +208,24 @@ impl Manager {
 
     pub fn enable_poll_with_intensity(&self, vid: &ValueID, intensity: u8) -> bool {
         unsafe {
-            extern_manager::manager_enable_poll_with_intensity(self.ptr, &vid.as_ozw_vid(), intensity)
+            extern_manager::manager_enable_poll_with_intensity(
+                self.ptr,
+                &vid.as_ozw_vid(),
+                intensity,
+            )
         }
     }
 
     pub fn enable_poll(&self, vid: &ValueID) -> bool {
-        unsafe {
-            extern_manager::manager_enable_poll(self.ptr, &vid.as_ozw_vid())
-        }
+        unsafe { extern_manager::manager_enable_poll(self.ptr, &vid.as_ozw_vid()) }
     }
 
     pub fn disable_poll(&self, vid: &ValueID) -> bool {
-        unsafe {
-            extern_manager::manager_disable_poll(self.ptr, &vid.as_ozw_vid())
-        }
+        unsafe { extern_manager::manager_disable_poll(self.ptr, &vid.as_ozw_vid()) }
     }
 
     pub fn is_polled(&self, vid: &ValueID) -> bool {
-        unsafe {
-            extern_manager::manager_is_polled(self.ptr, &vid.as_ozw_vid())
-        }
+        unsafe { extern_manager::manager_is_polled(self.ptr, &vid.as_ozw_vid()) }
     }
 
     pub fn set_poll_intensity(&self, vid: &ValueID, intensity: u8) {
@@ -203,9 +235,7 @@ impl Manager {
     }
 
     pub fn get_poll_intensity(&self, vid: &ValueID) -> u8 {
-        unsafe {
-            extern_manager::manager_get_poll_intensity(self.ptr, &vid.as_ozw_vid())
-        }
+        unsafe { extern_manager::manager_get_poll_intensity(self.ptr, &vid.as_ozw_vid()) }
     }
 }
 
@@ -221,4 +251,3 @@ impl Drop for Manager {
         unsafe { extern_manager::manager_destroy() }
     }
 }
-

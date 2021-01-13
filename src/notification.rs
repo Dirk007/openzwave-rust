@@ -7,19 +7,26 @@ use ffi::utils::{ rust_string_creator, recover_string };
 use node::Node;
 use controller::Controller;
 
+#[derive(Debug)]
 pub struct Notification {
-    ptr: *const ExternNotification
+    pub notification_type: u8,
+    pub home_id: u32,
 }
 
 impl Notification {
     pub fn new(ptr: *const ExternNotification) -> Notification {
-        // Because the Notification object is not mutable, we might as well just fetch all
-        // information right away and store it in a normal rust struct ?
-        Notification {
-            ptr: ptr
-        }
+        log::info!("Creating from {:?}", ptr);
+
+        let foo = Notification {
+            notification_type: unsafe { extern_notification::notification_get_type(ptr) },
+            home_id: unsafe { extern_notification::notification_get_home_id(ptr) }
+        };
+        log::info!("Created from {:?}", ptr);
+        log::info!("Created from {:?} -> {:?}", ptr, foo);
+        foo
     }
 
+    /*
     pub fn get_type(&self) -> NotificationType {
         unsafe { extern_notification::notification_get_type(self.ptr) }
     }
@@ -107,8 +114,10 @@ impl Notification {
             } as *mut c_char
         )
     }
+    */
 }
 
+/*
 use std::fmt;
 impl fmt::Display for Notification {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -133,3 +142,4 @@ impl fmt::Debug for Notification {
         )
     }
 }
+*/
