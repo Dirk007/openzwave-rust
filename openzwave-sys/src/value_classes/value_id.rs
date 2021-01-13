@@ -27,7 +27,7 @@ pub enum ValueType {
 use std::fmt;
 impl fmt::Display for ValueType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.pad(&format!("{:?}", self)[10..]) // Strip off the leading ValueType_
+        f.pad(&format!("{:?}", self))
     }
 }
 

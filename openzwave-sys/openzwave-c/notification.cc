@@ -14,8 +14,8 @@ extern "C" {
     return notification->GetNodeId();
   }
 
-  ValueID notification_get_value_id(const Notification * notification) {
-    return notification->GetValueID();
+  uint64 notification_get_value_id(const Notification * notification) {
+    return notification->GetValueID().GetId();
   }
 
   uint8 notification_get_group_idx(const Notification * notification) {

@@ -34,6 +34,50 @@ pub enum NotificationType {
     TypeDriverRemoved,
     TypeControllerCommand,
     TypeNodeReset,
+    UserAlerts,
+    ManufacturerSpecificDBReady,
+}
+
+impl From<u8> for NotificationType {
+    fn from(n: u8) -> NotificationType {
+        match n {
+            0 => Self::TypeValueAdded,
+            1 => Self::TypeValueRemoved,
+            2 => Self::TypeValueChanged,
+            3 => Self::TypeValueRefreshed,
+            4 => Self::TypeGroup,
+            5 => Self::TypeNodeNew,
+            6 => Self::TypeNodeAdded,
+            7 => Self::TypeNodeRemoved,
+            8 => Self::TypeNodeProtocolInfo,
+            9 => Self::TypeNodeNaming,
+            10 => Self::TypeNodeEvent,
+            11 => Self::TypePollingDisabled,
+            12 => Self::TypePollingEnabled,
+            13 => Self::TypeSceneEvent,
+            14 => Self::TypeCreateButton,
+            15 => Self::TypeDeleteButton,
+            16 => Self::TypeButtonOn,
+            17 => Self::TypeButtonOff,
+            18 => Self::TypeDriverReady,
+            19 => Self::TypeDriverFailed,
+            20 => Self::TypeDriverReset,
+            21 => Self::TypeEssentialNodeQueriesComplete,
+            22 => Self::TypeNodeQueriesComplete,
+            23 => Self::TypeAwakeNodesQueried,
+            24 => Self::TypeAllNodesQueriedSomeDead,
+            25 => Self::TypeAllNodesQueried,
+            26 => Self::TypeNotification,
+            27 => Self::TypeDriverRemoved,
+            28 => Self::TypeControllerCommand,
+            29 => Self::TypeNodeReset,
+            30 => Self::UserAlerts,
+            31 => Self::ManufacturerSpecificDBReady,
+            _ => {
+                panic!(format!("Unknown NotificationCode: {}", n));
+            }
+        }
+    }
 }
 
 c_like_enum! {
@@ -106,7 +150,7 @@ extern "C" {
     pub fn notification_get_type(notification: *const Notification) -> u8;
     pub fn notification_get_home_id(notification: *const Notification) -> u32;
     pub fn notification_get_node_id(notification: *const Notification) -> u8;
-    pub fn notification_get_value_id(notification: *const Notification) -> ValueID;
+    pub fn notification_get_value_id(notification: *const Notification) -> u64;
     pub fn notification_get_group_idx(notification: *const Notification) -> u8;
     pub fn notification_get_event(notification: *const Notification) -> u8;
     pub fn notification_get_button_id(notification: *const Notification) -> u8;

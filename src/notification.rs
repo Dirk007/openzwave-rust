@@ -9,43 +9,46 @@ use controller::Controller;
 
 #[derive(Debug)]
 pub struct Notification {
-    pub notification_type: u8,
+    pub notification_type: NotificationType,
     pub home_id: u32,
+    pub node_id: u8,
+    pub value_id: Option<ValueID>,
+    
 }
 
 impl Notification {
     pub fn new(ptr: *const ExternNotification) -> Notification {
         log::info!("Creating from {:?}", ptr);
 
+        let home_id = unsafe { extern_notification::notification_get_home_id(ptr) };
+        let node_id = unsafe { extern_notification::notification_get_node_id(ptr) };
+
+        log::info!("HomeId {:x}, NodeId {:x}", home_id, node_id);
+
         let foo = Notification {
-            notification_type: unsafe { extern_notification::notification_get_type(ptr) },
-            home_id: unsafe { extern_notification::notification_get_home_id(ptr) }
+            notification_type: unsafe { extern_notification::notification_get_type(ptr).into() },
+            home_id: home_id.clone(),
+            node_id: node_id.clone(),
+            value_id: match home_id {
+                0 => None,
+                _ => unsafe {
+                        let ozw_vid = extern_notification::notification_get_value_id(ptr);
+                        log::info!("OZW VID {:x}", ozw_vid);
+                        Some(ValueID::from_packed_id(home_id, ozw_vid))
+                        // Some(ValueID::from_packed_id(home_id, extern_value_id::value_id_get_id(&ozw_vid)))
+                    }
+            },
         };
         log::info!("Created from {:?}", ptr);
         log::info!("Created from {:?} -> {:?}", ptr, foo);
         foo
     }
 
-    /*
-    pub fn get_type(&self) -> NotificationType {
-        unsafe { extern_notification::notification_get_type(self.ptr) }
-    }
-
-    pub fn get_home_id(&self) -> u32 {
-        unsafe { extern_notification::notification_get_home_id(self.ptr) }
-    }
-
     pub fn get_controller(&self) -> Controller {
-        Controller::new(self.get_home_id())
+        Controller::new(self.home_id)
     }
 
-    pub fn get_node_id(&self) -> u8 {
-        unsafe { extern_notification::notification_get_node_id(self.ptr) }
-    }
-
-    pub fn get_node(&self) -> Node {
-        Node::from_id(self.get_home_id(), self.get_node_id())
-    }
+    /*
 
     pub fn get_value_id(&self) -> ValueID {
         unsafe {

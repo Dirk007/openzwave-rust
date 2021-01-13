@@ -216,6 +216,7 @@ pub struct ValueID {
 
 impl ValueID {
     pub fn from_packed_id(home_id: u32, id: u64) -> ValueID {
+        log::info!("Creating ValueId for {:x}", id);
         ValueID {
             home_id: home_id,
             id: id,

@@ -17,7 +17,7 @@ uint32 notification_get_home_id(const Notification *);
 
 uint8 notification_get_node_id(const Notification *);
 
-ValueID notification_get_value_id(const Notification *);
+uint64 notification_get_value_id(const Notification *);
 
 uint8 notification_get_group_idx(const Notification *);
 
