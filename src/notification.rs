@@ -9,11 +9,33 @@ use controller::Controller;
 
 #[derive(Debug)]
 pub struct Notification {
+    ptr: *const ExternNotification,
     pub notification_type: NotificationType,
     pub home_id: u32,
     pub node_id: u8,
     pub value_id: Option<ValueID>,
-    
+    pub group_idx: Option<u8>,
+    pub event: Option<u8>,
+    pub button_id: Option<u8>,
+    pub scene_id: Option<u8>,
+    pub controller_state: Option<ControllerState>,
+    pub notification_code: Option<NotificationCode>,
+}
+
+impl Into<String> for Notification {
+    fn into(self) -> String {
+        recover_string(
+            unsafe {
+                extern_notification::notification_get_as_string(self.ptr, rust_string_creator)
+            } as *mut c_char
+        )
+    }
+}
+
+impl Into<u8> for Notification {
+    fn into(self) -> u8 {
+        unsafe { extern_notification::notification_get_byte(self.ptr) }
+    }
 }
 
 impl Notification {
@@ -22,21 +44,51 @@ impl Notification {
 
         let home_id = unsafe { extern_notification::notification_get_home_id(ptr) };
         let node_id = unsafe { extern_notification::notification_get_node_id(ptr) };
+        let notification_type = unsafe { extern_notification::notification_get_type(ptr).into() };
 
         log::info!("HomeId {:x}, NodeId {:x}", home_id, node_id);
 
         let foo = Notification {
-            notification_type: unsafe { extern_notification::notification_get_type(ptr).into() },
-            home_id: home_id.clone(),
-            node_id: node_id.clone(),
+            ptr,
+            notification_type,
+            home_id,
+            node_id,
             value_id: match home_id {
                 0 => None,
                 _ => unsafe {
                         let ozw_vid = extern_notification::notification_get_value_id(ptr);
-                        log::info!("OZW VID {:x}", ozw_vid);
-                        Some(ValueID::from_packed_id(home_id, ozw_vid))
-                        // Some(ValueID::from_packed_id(home_id, extern_value_id::value_id_get_id(&ozw_vid)))
+                            if ozw_vid >> 32 > 0 {
+                                log::info!("OZW VID {:x}", ozw_vid);
+                                Some(ValueID::from_packed_id(home_id, ozw_vid))
+                            } else {
+                                None
+                            }
                     }
+            },
+            group_idx: match notification_type {
+                NotificationType::Group =>
+                    Some(unsafe { extern_notification::notification_get_group_idx(ptr) }),
+                _ => None
+            },
+            event: match notification_type {
+                NotificationType::NodeEvent | NotificationType::ControllerCommand => Some(unsafe { extern_notification::notification_get_event(ptr) }),
+                _ => None
+            },
+            button_id: match notification_type {
+                NotificationType::CreateButton | NotificationType::DeleteButton | NotificationType::ButtonOn | NotificationType::ButtonOff => Some(unsafe { extern_notification::notification_get_button_id(ptr) }),
+                _ => None
+            },
+            scene_id: match notification_type {
+                NotificationType::SceneEvent => Some(unsafe { extern_notification::notification_get_scene_id(ptr) }),
+                _ => None
+            },
+            controller_state: match notification_type {
+                NotificationType::ControllerCommand => ControllerState::from_u8(unsafe { extern_notification::notification_get_notification(ptr) }),
+                _ => None
+            },
+            notification_code: match notification_type {
+                NotificationType::Notification => NotificationCode::from_u8(unsafe { extern_notification::notification_get_notification(ptr) }),
+                _ => None
             },
         };
         log::info!("Created from {:?}", ptr);
@@ -47,102 +99,4 @@ impl Notification {
     pub fn get_controller(&self) -> Controller {
         Controller::new(self.home_id)
     }
-
-    /*
-
-    pub fn get_value_id(&self) -> ValueID {
-        unsafe {
-            let ozw_vid = extern_notification::notification_get_value_id(self.ptr);
-
-            ValueID::from_packed_id(extern_value_id::value_id_get_home_id(&ozw_vid),
-                                    extern_value_id::value_id_get_id(&ozw_vid))
-        }
-    }
-
-    pub fn get_group_idx(&self) -> Option<u8> {
-        match self.get_type() {
-            NotificationType::Type_Group =>
-                Some(unsafe { extern_notification::notification_get_group_idx(self.ptr) }),
-            _ => None
-        }
-    }
-
-    pub fn get_event(&self) -> Option<u8> {
-        match self.get_type() {
-            NotificationType::Type_NodeEvent | NotificationType::Type_ControllerCommand =>
-                Some(unsafe { extern_notification::notification_get_event(self.ptr) }),
-            _ => None
-        }
-    }
-
-    pub fn get_button_id(&self) -> Option<u8> {
-        match self.get_type() {
-            NotificationType::Type_CreateButton | NotificationType::Type_DeleteButton |
-            NotificationType::Type_ButtonOn | NotificationType::Type_ButtonOff =>
-                Some(unsafe { extern_notification::notification_get_button_id(self.ptr) }),
-            _ => None
-        }
-    }
-
-    pub fn get_scene_id(&self) -> Option<u8> {
-        match self.get_type() {
-            NotificationType::Type_SceneEvent =>
-                Some(unsafe { extern_notification::notification_get_scene_id(self.ptr) }),
-            _ => None
-        }
-    }
-
-    pub fn get_controller_state(&self) -> Option<ControllerState> {
-        if self.get_type() != NotificationType::Type_ControllerCommand {
-            return None;
-        }
-        ControllerState::from_u8(unsafe { extern_notification::notification_get_notification(self.ptr) })
-    }
-
-    pub fn get_notification_code(&self) -> Option<NotificationCode> {
-        if self.get_type() != NotificationType::Type_Notification {
-            return None;
-        }
-        NotificationCode::from_u8(unsafe { extern_notification::notification_get_notification(self.ptr) })
-    }
-
-    pub fn get_byte(&self) -> u8 {
-        unsafe { extern_notification::notification_get_byte(self.ptr) }
-    }
-
-    pub fn get_as_string(&self) -> String {
-        recover_string(
-            unsafe {
-                extern_notification::notification_get_as_string(self.ptr, rust_string_creator)
-            } as *mut c_char
-        )
-    }
-    */
 }
-
-/*
-use std::fmt;
-impl fmt::Display for Notification {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.get_as_string())
-    }
-}
-
-impl fmt::Debug for Notification {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Notification {{ type: {:?}, home_id: {:?}, group_idx: {:?}, event: {:?}, button_id: {:?}, scene_id: {:?}, notification: {:?}, byte: {:?}, as_string: {:?}, \
-                   value_id: {:?} }}",
-               self.get_type(),
-               self.get_home_id(),
-               self.get_group_idx(),
-               self.get_event(),
-               self.get_button_id(),
-               self.get_scene_id(),
-               self.get_notification_code(),
-               self.get_byte(),
-               self.get_as_string(),
-               self.get_value_id()
-        )
-    }
-}
-*/
