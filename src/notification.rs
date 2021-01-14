@@ -53,7 +53,10 @@ impl Notification {
 
         let home_id = unsafe { extern_notification::notification_get_home_id(ptr) };
         let node_id = unsafe { extern_notification::notification_get_node_id(ptr) };
-        let notification_type = unsafe { extern_notification::notification_get_type(ptr).into() };
+        let notification_type = match NotificationType::from_u8(unsafe { extern_notification::notification_get_type(ptr) }) {
+            Some(converted) => converted,
+            None => NotificationType::Unknown,
+        };
 
         Self {
             ptr,
