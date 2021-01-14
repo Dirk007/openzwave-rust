@@ -28,22 +28,10 @@ struct WatcherWrapper {
 
 // watcher is actually a Box<WatcherWrapper>
 extern "C" fn watcher_cb(notification: *const ExternNotification, watcher: *const c_void) {
-    log::info!(
-        "watcher_cb -> notification ptr = {:?} - start",
-        notification
-    );
     let watcher_wrapper: &WatcherWrapper = unsafe { &*(watcher as *const WatcherWrapper) };
-    log::info!(
-        "watcher_cb -> notification ptr = {:?} - convert",
-        notification
-    );
     let rust_notification = Notification::new(notification);
-    log::info!(
-        "watcher_cb -> notification converted ({:?})",
-        rust_notification
-    );
     // log::info!("watcher_cb -> {:?}", rust_notification.notification_type);
-    //watcher_wrapper.watcher.on_notification(&notification);
+    watcher_wrapper.watcher.on_notification(&rust_notification);
 }
 
 impl Manager {

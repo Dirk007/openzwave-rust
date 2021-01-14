@@ -43,17 +43,19 @@ impl Into<u8> for Notification {
     }
 }
 
+#[inline(always)]
+fn is_valid_value_id(value: u64) -> bool {
+    value >> 32 > 0
+}
+
 impl Notification {
-    pub fn new(ptr: *const ExternNotification) -> Notification {
-        log::info!("Creating from {:?}", ptr);
+    pub fn new(ptr: *const ExternNotification) -> Self {
 
         let home_id = unsafe { extern_notification::notification_get_home_id(ptr) };
         let node_id = unsafe { extern_notification::notification_get_node_id(ptr) };
         let notification_type = unsafe { extern_notification::notification_get_type(ptr).into() };
 
-        log::info!("HomeId {:x}, NodeId {:x}", home_id, node_id);
-
-        let foo = Notification {
+        Self {
             ptr,
             notification_type,
             home_id,
@@ -62,8 +64,7 @@ impl Notification {
                 0 => None,
                 _ => unsafe {
                         let ozw_vid = extern_notification::notification_get_value_id(ptr);
-                            if ozw_vid >> 32 > 0 {
-                                log::info!("OZW VID {:x}", ozw_vid);
+                            if is_valid_value_id(ozw_vid) {
                                 Some(ValueID::from_packed_id(home_id, ozw_vid))
                             } else {
                                 None
@@ -95,10 +96,7 @@ impl Notification {
                 NotificationType::NodeEvent | NotificationType::ControllerCommand => Some(unsafe { extern_notification::notification_get_event(ptr) }),
                 _ => None
             },
-        };
-        log::info!("Created from {:?}", ptr);
-        log::info!("Created from {:?} -> {:?}", ptr, foo);
-        foo
+        }
     }
 
     pub fn get_controller(&self) -> Controller {
