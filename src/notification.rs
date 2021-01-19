@@ -13,13 +13,19 @@ pub enum NotificationValue {
 }
 
 #[derive(Debug, Clone)]
+pub enum Event {
+    Controller(ControllerState),
+    Node(u8),
+}
+
+#[derive(Debug, Clone)]
 pub struct Notification {
     pub notification_type: NotificationType,
     pub home_id: u32,
     pub node_id: u8,
     pub value_id: Option<ValueID>,
     pub value: Option<NotificationValue>,
-    pub event: Option<u8>,
+    pub event: Option<Event>,
 }
 
 #[inline(always)]
@@ -74,7 +80,14 @@ impl Notification {
                 _ => None,
             },
             event: match notification_type {
-                NotificationType::NodeEvent | NotificationType::ControllerCommand => Some(unsafe { extern_notification::notification_get_event(ptr) }),
+                NotificationType::ControllerCommand => {
+                    let value = unsafe { extern_notification::notification_get_event(ptr) };
+                    Some(Event::Controller(ControllerState::from_u8(value).expect(format!("Unknown ControllerState received! -> {:?}", value).as_str())))
+                }
+                NotificationType::NodeEvent => {
+                    let value = unsafe { extern_notification::notification_get_event(ptr) };
+                    Some(Event::Node(value))
+                },
                 _ => None
             },
         }
