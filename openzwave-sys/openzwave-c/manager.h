@@ -16,6 +16,9 @@ Manager * manager_get();
 void manager_destroy();
 void manager_write_config(Manager * manager, uint32 home_id);
 
+void manager_soft_reset_controller(Manager * manager, uint32 home_id);
+void manager_reset_controller(Manager * manager, uint32 home_id);
+
 bool manager_add_node(Manager * manager, uint32 home_id, bool secure);
 bool manager_remove_node(Manager * manager, uint32 home_id);
 void manager_test_network_node(Manager * manager, uint32 home_id, uint8_t node_id, uint32_t count);

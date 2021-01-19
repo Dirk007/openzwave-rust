@@ -16,6 +16,14 @@ void manager_destroy() {
   Manager::Destroy();
 }
 
+void manager_soft_reset_controller(Manager * manager, uint32 home_id) {
+  manager->SoftReset(home_id);
+}
+
+void manager_reset_controller(Manager * manager, uint32 home_id) {
+  manager->ResetController(home_id);
+}
+
 void manager_write_config(Manager * manager, uint32 home_id) {
   manager->WriteConfig(home_id);
 }

@@ -14,6 +14,8 @@ pub enum ControllerInterface {
 }
 
 pub use self::{
+    manager_soft_reset_controller as soft_reset_controller,
+    manager_reset_controller as reset_controller,
     manager_add_driver as add_driver, manager_add_node as add_node,
     manager_add_watcher as add_watcher, manager_create as create, manager_destroy as destroy,
     manager_disable_poll as disable_poll, manager_enable_poll as enable_poll,
@@ -88,6 +90,8 @@ extern "C" {
     pub fn manager_create() -> *mut Manager;
     pub fn manager_get() -> *mut Manager;
     pub fn manager_destroy();
+    pub fn manager_soft_reset_controller(manager: *mut Manager, home_id: u32);
+    pub fn manager_reset_controller(manager: *mut Manager, home_id: u32);
     pub fn manager_write_config(manager: *mut Manager, home_id: u32);
     pub fn manager_add_node(manager: *mut Manager, home_id: u32, secure: bool) -> bool;
     pub fn manager_remove_node(manager: *mut Manager, home_id: u32) -> bool;
