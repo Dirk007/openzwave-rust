@@ -1,11 +1,11 @@
-use error::{Error, Result};
+use crate::error::{Error, Result};
 use ffi::manager as extern_manager;
 use ffi::utils::res_to_result;
 use libc::c_void;
-use notification::{ExternNotification, Notification};
-use options::Options;
+use crate::notification::{ExternNotification, Notification};
+use crate::options::Options;
 use std::ffi::CString;
-use value_classes::value_id::ValueID;
+use crate::value_classes::value_id::ValueID;
 
 #[allow(unused)]
 pub struct Manager {
@@ -18,12 +18,12 @@ unsafe impl Send for Manager {}
 unsafe impl Sync for Manager {}
 
 pub trait NotificationWatcher: Sync {
-    fn on_notification(&self, &Notification);
+    fn on_notification(&self, notification: &Notification);
 }
 
 #[allow(unused)]
 struct WatcherWrapper {
-    watcher: Box<NotificationWatcher>,
+    watcher: Box<dyn NotificationWatcher>,
 }
 
 // watcher is actually a Box<WatcherWrapper>
@@ -59,6 +59,18 @@ impl Manager {
         }
     }
     */
+
+    pub fn soft_reset_controller(&self, home_id: u32) {
+        unsafe {
+            extern_manager::soft_reset_controller(self.ptr, home_id);
+        }
+    }
+
+    pub fn reset_controller(&self, home_id: u32) {
+        unsafe {
+            extern_manager::reset_controller(self.ptr, home_id);
+        }
+    }
 
     pub fn add_node(&self, home_id: u32, secure: bool) -> Result<()> {
         res_to_result(unsafe { extern_manager::manager_add_node(self.ptr, home_id, secure) })

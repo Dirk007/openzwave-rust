@@ -1,6 +1,5 @@
 use libc::c_char;
 use utils::RustStringCreator;
-use value_classes::value_id::ValueID;
 
 c_like_enum! {
     NotificationType {

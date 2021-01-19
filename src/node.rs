@@ -3,7 +3,7 @@ use std::{ fmt, ptr };
 use ffi::manager as extern_manager;
 use ffi::utils::{ rust_string_creator, rust_vec_creator, recover_string, recover_vec };
 use libc::c_char;
-use controller::Controller;
+use crate::controller::Controller;
 use itertools::free::join;
 
 // Mapping comes from https://github.com/OpenZWave/open-zwave-control-panel/blob/master/zwavelib.cpp

@@ -2,11 +2,13 @@ use ffi::options as extern_options;
 use ffi::get_default_config_path;
 use std::ffi::CString;
 use ffi::utils::res_to_result;
-use error::{ Result, Error };
+use crate::error::{ Result, Error };
 
 pub struct Options {
     ptr: *mut extern_options::Options
 }
+
+unsafe impl Send for Options {}
 
 impl Options {
     pub fn create(config_path: &str, user_path: &str, command_line: &str) -> Result<Options> {

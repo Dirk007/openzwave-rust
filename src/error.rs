@@ -24,26 +24,26 @@ impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let str = match *self {
             Error::InitError(ref str) | Error::APIError(ref str) => {
-                format!("{}: {}", error::Error::description(self), str)
+                format!("{:?}: {}", self, str)
             },
             Error::GetError(ref specific_error) | Error::SetError(ref specific_error) => {
-                format!("{}: {:?}", error::Error::description(self), specific_error)
+                format!("{:?}: {:?}", self, specific_error)
             },
             Error::OptionsAreLocked(ref method) => {
-                format!("OptionsAreLocked Error: {} when calling method {}",
-                        error::Error::description(self),
+                format!("OptionsAreLocked Error: {:?} when calling method {}",
+                        self,
                         method
                        )
             }
             Error::OptionsAreNotLocked(ref method) => {
-                format!("OptionsAreNotLocked Error: {} when calling method {}",
-                        error::Error::description(self),
+                format!("OptionsAreNotLocked Error: {:?} when calling method {}",
+                        self,
                         method
                        )
             },
             Error::InvalidParameter(ref parameter, ref method) => {
-                format!("InvalidParameter Error: {} when calling method {}: {}",
-                        error::Error::description(self),
+                format!("InvalidParameter Error: {:?} when calling method {}: {}",
+                        self,
                         method,
                         parameter
                        )

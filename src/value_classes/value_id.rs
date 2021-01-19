@@ -1,4 +1,4 @@
-use error::{Error, GetSetError, Result};
+use crate::error::{Error, GetSetError, Result};
 use ffi::manager as extern_manager;
 use ffi::utils::res_to_result;
 use ffi::value_classes::value_id as extern_value_id;
@@ -106,11 +106,11 @@ impl fmt::Display for CommandClass {
     }
 }
 
-use controller::Controller;
+use crate::controller::Controller;
 use ffi::utils::{
     recover_string, recover_vec, rust_string_creator, rust_string_vec_creator, rust_vec_creator,
 };
-use node::Node;
+use crate::node::Node;
 
 pub struct ValueList<'a> {
     value_id: &'a ValueID,

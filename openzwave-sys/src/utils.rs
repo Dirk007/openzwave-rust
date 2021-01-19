@@ -13,7 +13,7 @@ pub enum APIError {
 
 impl fmt::Display for APIError {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", error::Error::description(self))
+        write!(formatter, "{:?}", self)
     }
 }
 

@@ -1,13 +1,9 @@
 pub use ffi::notification::{ ControllerState, ControllerError, NotificationType, NotificationCode, Notification as ExternNotification };
 use ffi::notification as extern_notification;
-use ffi::value_classes::value_id as extern_value_id;
-use value_classes::value_id::ValueID;
-use libc::c_char;
-use ffi::utils::{ rust_string_creator, recover_string };
-use node::Node;
-use controller::Controller;
+use crate::value_classes::value_id::ValueID;
+use crate::controller::Controller;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NotificationValue {
     Group(u8),
     Button(u8),
@@ -16,31 +12,14 @@ pub enum NotificationValue {
     Report(NotificationCode),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Notification {
-    ptr: *const ExternNotification,
     pub notification_type: NotificationType,
     pub home_id: u32,
     pub node_id: u8,
     pub value_id: Option<ValueID>,
     pub value: Option<NotificationValue>,
     pub event: Option<u8>,
-}
-
-impl Into<String> for Notification {
-    fn into(self) -> String {
-        recover_string(
-            unsafe {
-                extern_notification::notification_get_as_string(self.ptr, rust_string_creator)
-            } as *mut c_char
-        )
-    }
-}
-
-impl Into<u8> for Notification {
-    fn into(self) -> u8 {
-        unsafe { extern_notification::notification_get_byte(self.ptr) }
-    }
 }
 
 #[inline(always)]
@@ -59,7 +38,6 @@ impl Notification {
         };
 
         Self {
-            ptr,
             notification_type,
             home_id,
             node_id,
