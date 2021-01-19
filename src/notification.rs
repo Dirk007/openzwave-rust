@@ -14,7 +14,8 @@ pub enum NotificationValue {
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    Controller(ControllerState),
+    // There might be unknown CotnrollerStates so far
+    Controller(Option<ControllerState>),
     Node(u8),
 }
 
@@ -82,7 +83,13 @@ impl Notification {
             event: match notification_type {
                 NotificationType::ControllerCommand => {
                     let value = unsafe { extern_notification::notification_get_event(ptr) };
-                    Some(Event::Controller(ControllerState::from_u8(value).expect(format!("Unknown ControllerState received! -> {:?}", value).as_str())))
+                    let state = ControllerState::from_u8(value);
+
+                    if state.is_none() {
+                        log::error!("Unknown ControllerState received! -> {:?}", value);
+                    }
+
+                    Some(Event::Controller(state))
                 }
                 NotificationType::NodeEvent => {
                     let value = unsafe { extern_notification::notification_get_event(ptr) };
