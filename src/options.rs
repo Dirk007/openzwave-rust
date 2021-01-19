@@ -4,6 +4,27 @@ use std::ffi::CString;
 use ffi::utils::res_to_result;
 use crate::error::{ Result, Error };
 
+#[derive(Debug)]
+pub enum LogLevel {
+    None = 0,
+    All = 1,
+    Fatal = 2,
+    Error = 3,
+    Warning = 4,
+    Alert = 5,
+    Info = 6,
+    Detail = 7,
+    Debug = 8,
+    ProtocolAndEverything = 9,
+}
+
+impl From<LogLevel> for i32 {
+    fn from(l: LogLevel) -> i32 {
+        l as i32
+    }
+    
+}
+
 pub struct Options {
     ptr: *mut extern_options::Options
 }
