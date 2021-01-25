@@ -6,6 +6,7 @@ use libc::{c_char, c_void};
 use std::ffi::CString;
 use std::fmt;
 use std::ptr;
+use std::convert::{TryFrom, TryInto};
 
 pub use ffi::value_classes::value_id::{ValueGenre, ValueType};
 
@@ -208,24 +209,103 @@ impl<'a> fmt::Debug for ValueList<'a> {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Copy, Hash)]
+#[derive(Eq, PartialEq, Clone, Hash)]
 pub struct ValueID {
     home_id: u32,
     id: u64,
+    genre: Option<ValueGenre>,
+    label: String,
+    value: String,
+    units: String,
+}
+
+// FTR: big id is (uint64) (((uint64) m_id1 << 32) | m_id);
+
+// AKA m_id
+fn get_id0_from_id(id: u64) -> u32 {
+    id as u32
+}
+
+// AKA m_id1
+#[allow(unused)]
+fn get_id1_from_id(id: u64) -> u32 {
+    (id >> 32) as u32
+}
+
+fn get_genre(id: u32) -> Option<ValueGenre> {
+    let genre: u8 = ((id & 0x00c00000) >> 22) as u8;
+    genre.try_into().ok()
+}
+
+fn create_vid(home_id: u32, id: u64) -> extern_value_id::ValueID {
+    unsafe { extern_value_id::value_id_from_packed_id(home_id, id) }
+}
+
+fn get_value_as_string(id: &extern_value_id::ValueID) -> Result<String> {
+    // The underlying C++ lib returns a value for any type.
+    let manager_ptr = unsafe { extern_manager::get() };
+    let mut raw_string: *mut c_char = ptr::null_mut();
+
+    let res = unsafe {
+        extern_manager::get_value_as_string(
+            manager_ptr,
+            id,
+            &mut raw_string,
+            rust_string_creator,
+        )
+    };
+
+    if res {
+        Ok(recover_string(raw_string))
+    } else {
+        Err(Error::GetError(GetSetError::APIError("as_string")))
+    }        
 }
 
 impl ValueID {
     pub fn from_packed_id(home_id: u32, id: u64) -> ValueID {
+        let vid = create_vid(home_id, id);
+
+        let label: String = recover_string(unsafe {
+            let manager_ptr = extern_manager::get();
+            extern_manager::get_value_label(manager_ptr, &vid, rust_string_creator)
+        });
+
+        let value = get_value_as_string(&create_vid(home_id, id)).unwrap();
+
+        let units =         recover_string(unsafe {
+            let manager_ptr = extern_manager::get();
+            extern_manager::get_value_units(manager_ptr, &vid, rust_string_creator)
+        });
+
+
         ValueID {
             home_id: home_id,
             id: id,
+            genre: get_genre(get_id0_from_id(id)),
+            label,
+            value,
+            units,
         }
     }
 
-    pub fn as_ozw_vid(&self) -> extern_value_id::ValueID {
-        unsafe { extern_value_id::value_id_from_packed_id(self.home_id, self.id) }
+    pub fn label(&self) -> &str {
+        &self.label
     }
 
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+
+    pub fn units(&self) -> &str {
+        &self.units
+    }
+
+    pub fn as_ozw_vid(&self) -> extern_value_id::ValueID {
+        create_vid(self.home_id, self. id)
+    }
+
+    /*
     pub fn from_values(
         home_id: u32,
         node_id: u8,
@@ -246,11 +326,16 @@ impl ValueID {
                 value_type,
             )
         };
+        let id = unsafe { extern_value_id::value_id_get_id(&ozw_vid) };
+        let genre = get_genre(get_id0_from_id(id));
         ValueID {
             home_id: unsafe { extern_value_id::value_id_get_home_id(&ozw_vid) },
-            id: unsafe { extern_value_id::value_id_get_id(&ozw_vid) },
+            id,
+            genre,
+            label: "".into(),
         }
     }
+    */
 
     // instance methods
     pub fn get_controller(&self) -> Controller {
@@ -269,8 +354,9 @@ impl ValueID {
         unsafe { extern_value_id::value_id_get_node_id(&self.as_ozw_vid()) }
     }
 
-    pub fn get_genre(&self) -> ValueGenre {
-        unsafe { extern_value_id::value_id_get_genre(&self.as_ozw_vid()) }
+    pub fn get_genre(&self) -> Option<ValueGenre> {
+        // unsafe { extern_value_id::value_id_get_genre(&self.as_ozw_vid()) }
+        self.genre
     }
 
     pub fn get_command_class_id(&self) -> u8 {
@@ -404,24 +490,7 @@ impl ValueID {
     }
 
     pub fn as_string(&self) -> Result<String> {
-        // The underlying C++ lib returns a value for any type.
-        let manager_ptr = unsafe { extern_manager::get() };
-        let mut raw_string: *mut c_char = ptr::null_mut();
-
-        let res = unsafe {
-            extern_manager::get_value_as_string(
-                manager_ptr,
-                &self.as_ozw_vid(),
-                &mut raw_string,
-                rust_string_creator,
-            )
-        };
-
-        if res {
-            Ok(recover_string(raw_string))
-        } else {
-            Err(Error::GetError(GetSetError::APIError("as_string")))
-        }
+        get_value_as_string(&self.as_ozw_vid())
     }
 
     pub fn as_raw(&self) -> Result<Box<Vec<u8>>> {
@@ -689,7 +758,7 @@ impl fmt::Display for ValueID {
 
 impl fmt::Debug for ValueID {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ValueID {{ home_id: {:?}, node_id: {:?}, genre: {:?}, command_class: {:?}, \
+        write!(f, "ValueID {{ home_id: {:?}, node_id: {:?}, genre: {:?}({:?}), command_class: {:?}, \
                    instance: {:?}, index: {:?}, type: {:?}, id: {:?}, \
                    label: {:?}, units: {:?}, help: {:?}, min: {:?}, max: {:?}, is_read_only: {:?}, \
                    is_write_only: {:?}, is_set: {:?}, is_polled: {:?}, \
@@ -700,6 +769,7 @@ impl fmt::Debug for ValueID {
                self.get_home_id(),
                self.get_node_id(),
                self.get_genre(),
+               self.genre,
                self.get_command_class(),
                self.get_instance(),
                self.get_index(),

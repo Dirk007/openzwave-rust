@@ -16,6 +16,10 @@ void manager_destroy() {
   Manager::Destroy();
 }
 
+void manager_cancel_controller_command(Manager * manager, uint32 home_id) {
+  manager->CancelControllerCommand(home_id);
+}
+
 void manager_soft_reset_controller(Manager * manager, uint32 home_id) {
   manager->SoftReset(home_id);
 }

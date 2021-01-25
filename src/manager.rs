@@ -60,15 +60,21 @@ impl Manager {
     }
     */
 
+    pub fn reset_controller(&self, home_id: u32) {
+        unsafe {
+            extern_manager::reset_controller(self.ptr, home_id);
+        }
+    }
+
     pub fn soft_reset_controller(&self, home_id: u32) {
         unsafe {
             extern_manager::soft_reset_controller(self.ptr, home_id);
         }
     }
 
-    pub fn reset_controller(&self, home_id: u32) {
+    pub fn cancel_controller_command(&self, home_id: u32) {
         unsafe {
-            extern_manager::reset_controller(self.ptr, home_id);
+            extern_manager::cancel_controller_command(self.ptr, home_id);
         }
     }
 

@@ -1,11 +1,27 @@
-#[repr(C)]
-#[derive(Debug, PartialEq, Clone, Copy)]
+use std::convert::{TryFrom, TryInto};
+
+#[repr(u8)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum ValueGenre {
     Basic = 0,
-    User,
-    Config,
-    System,
-    Count,
+    User = 1,
+    Config = 2,
+    System = 3,
+    Count = 4,
+}
+
+impl TryFrom<u8> for ValueGenre {
+    type Error = ();
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Basic),
+            1 => Ok(Self::User),
+            2 => Ok(Self::Config),
+            3 => Ok(Self::System),
+            4 => Ok(Self::Count),
+            _ => Err(()),
+        }
+    }
 }
 
 #[repr(C)]
