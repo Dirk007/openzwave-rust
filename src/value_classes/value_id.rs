@@ -6,7 +6,7 @@ use libc::{c_char, c_void};
 use std::ffi::CString;
 use std::fmt;
 use std::ptr;
-use std::convert::{TryFrom, TryInto};
+use std::convert::{TryInto};
 
 pub use ffi::value_classes::value_id::{ValueGenre, ValueType};
 
@@ -271,9 +271,20 @@ impl ValueID {
             extern_manager::get_value_label(manager_ptr, &vid, rust_string_creator)
         });
 
-        let value = get_value_as_string(&create_vid(home_id, id)).unwrap();
+        let value =
+        if label.is_empty() {
+            "<ValueRemoved>".into()
+        } else {
+            match get_value_as_string(&create_vid(home_id, id)) {
+                Ok(value) => value,
+                Err(e) => {
+                    log::error!("ValueRemoved? Unable to stringify value for label '{}', home_id={}, id0=0x{:X}, id1=0x{:X}: {:?}",  label, home_id, get_id0_from_id(id), get_id1_from_id(id), e);
+                    "<error>".into()
+                }
+            }
+        };
 
-        let units =         recover_string(unsafe {
+        let units = recover_string(unsafe {
             let manager_ptr = extern_manager::get();
             extern_manager::get_value_units(manager_ptr, &vid, rust_string_creator)
         });
