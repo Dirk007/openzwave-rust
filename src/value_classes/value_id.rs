@@ -10,6 +10,108 @@ use std::convert::{TryInto};
 
 pub use ffi::value_classes::value_id::{ValueGenre, ValueType};
 
+// Helper to have a hashable float
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+pub struct DecimalValue {
+    pub value: i64,
+    pub precision: u8,
+}
+
+// Rustified ValueType
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+pub enum ValueContent {
+    Bool(bool),
+    Byte(u8),
+    Decimal(DecimalValue),
+    Int(i32),
+    List(String), //< ?
+    Schedule, //< ?
+    Short(i16),
+    String(String),
+    Button(bool),
+    Raw, //< ? Vec<u8>?
+    //
+    Unknown, //< null
+}
+
+impl ToString for DecimalValue {
+    fn to_string(&self) -> String {
+        let shift = 10_f64.powi(self.precision as i32);
+        let value: f64 = self.value as f64 / shift;
+        format!("{:.1$}", value, self.precision as usize)
+    }
+}
+
+impl DecimalValue {
+    pub fn from_f32(value: f32, precision: u8) -> Self {
+        let shift = 10_f32.powi(precision as i32);
+        Self {
+            value: (value * shift).trunc() as i64,
+            precision
+        }
+    }
+}
+
+#[cfg(test)]
+fn test_value_content() {
+    assert_eq!(
+        DecimalValue {
+            value: 230,
+            precision: 1,
+        }
+        .to_string(),
+        "23.0"
+    );
+
+    assert_eq!(
+        DecimalValue {
+            value: 2300,
+            precision: 2,
+        }
+        .to_string(),
+        "23.00"
+    );
+
+    assert_eq!(
+        DecimalValue {
+            value: 123456,
+            precision: 3,
+        }
+        .to_string(),
+        "123.456"
+    );
+
+    assert_eq!(
+        DecimalValue {
+            value: 123,
+            precision: 0,
+        }
+        .to_string(),
+        "123"
+    );
+
+    assert_eq!(DecimalValue::from_f32(123 as f32, 0).to_string(), "123");
+    assert_eq!(
+        DecimalValue::from_f32(123.45 as f32, 2).to_string(),
+        "123.45"
+    );
+}
+
+impl fmt::Display for ValueContent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {            
+            Self::Bool(val) | 
+            Self::Button(val) => write!(f, "{}", val),
+            Self::Byte(val) => write!(f, "{}", val),
+            Self::Int(val) => write!(f, "{}", val),
+            Self::Short(val) => write!(f, "{}", val),
+            Self::String(val) | Self::List(val) => write!(f, "\"{}\"", val),
+            Self::Decimal(val) => write!(f, "{}", val.to_string()),
+            Self::Unknown | Self::Schedule | Self::Raw => write!(f, "null"),
+        }
+    }
+}
+
 // Mapping comes from https://github.com/OpenZWave/open-zwave-control-panel/blob/master/zwavelib.cpp
 c_like_enum! {
     CommandClass {
@@ -113,11 +215,11 @@ use ffi::utils::{
 };
 use crate::node::Node;
 
-pub struct ValueList<'a> {
-    value_id: &'a ValueID,
+pub struct ValueList {
+    id: extern_value_id::ValueID,
 }
 
-impl<'a> ValueList<'a> {
+impl ValueList {
     pub fn selection_as_string(&self) -> Result<String> {
         let manager_ptr = unsafe { extern_manager::get() };
         let mut raw_string: *mut c_char = ptr::null_mut();
@@ -125,7 +227,7 @@ impl<'a> ValueList<'a> {
         let res = unsafe {
             extern_manager::get_value_list_selection_as_string(
                 manager_ptr,
-                &self.value_id.as_ozw_vid(),
+                &self.id,
                 &mut raw_string,
                 rust_string_creator,
             )
@@ -146,7 +248,7 @@ impl<'a> ValueList<'a> {
         let res = unsafe {
             extern_manager::get_value_list_selection_as_int(
                 manager_ptr,
-                &self.value_id.as_ozw_vid(),
+                &self.id,
                 &mut val,
             )
         };
@@ -166,7 +268,7 @@ impl<'a> ValueList<'a> {
         let res = unsafe {
             extern_manager::get_value_list_items(
                 manager_ptr,
-                &self.value_id.as_ozw_vid(),
+                &self.id,
                 c_items_void_ptr,
                 rust_string_vec_creator,
             )
@@ -185,7 +287,7 @@ impl<'a> ValueList<'a> {
         let res = unsafe {
             extern_manager::get_value_list_values(
                 manager_ptr,
-                &self.value_id.as_ozw_vid(),
+                &self.id,
                 c_values_void_ptr,
                 rust_vec_creator::<i32>,
             )
@@ -198,7 +300,7 @@ impl<'a> ValueList<'a> {
     }
 }
 
-impl<'a> fmt::Debug for ValueList<'a> {
+impl fmt::Debug for ValueList {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ValueList {{ selection_as_string: {:?}, selection_as_int: {:?}, items: {:?}, values: {:?} }}",
                self.selection_as_string().ok(),
@@ -215,7 +317,8 @@ pub struct ValueID {
     id: u64,
     genre: Option<ValueGenre>,
     label: String,
-    value: String,
+    value_type: ValueType,
+    value: ValueContent,
     units: String,
 }
 
@@ -262,6 +365,82 @@ fn get_value_as_string(id: &extern_value_id::ValueID) -> Result<String> {
     }        
 }
 
+macro_rules! get_low_level_value {
+    ($($typ:ty, $default:expr, $target:ident, $funci:ident, $manager_ptr:ident, $id:ident),+) => {
+        $(
+            {
+                let mut val: $typ = $default;
+                let res = unsafe {
+                    extern_manager::$funci($manager_ptr, $id, &mut val)
+                };
+                if res {
+                    Some(ValueContent::$target(val))
+                } else {
+                    None
+                }
+            }
+        )*
+    };
+}
+
+macro_rules! get_low_level_value_primitive {
+    ($($typ:ty, $default:expr, $funci:ident, $manager_ptr:ident, $id:ident),+) => {
+        $(
+            {
+                let mut val: $typ = $default;
+                // FIXME: Simplyfy as soon as bool.then_some() is no more nightly
+                if unsafe {
+                    extern_manager::$funci($manager_ptr, $id, &mut val)
+                } {
+                    Some(val)
+                } else {
+                    None
+                }
+            }
+        )*
+    };
+}
+
+fn extract_value(id: &extern_value_id::ValueID, value_type: ValueType) -> Option<ValueContent> {
+    let manager_ptr = unsafe { extern_manager::get() };
+
+    match value_type {
+        ValueType::Bool => {
+            get_low_level_value!(bool, false, Bool, get_value_as_bool, manager_ptr, id)
+        },
+        ValueType::Byte => {
+            get_low_level_value!(u8, 0, Byte, get_value_as_byte, manager_ptr, id)
+        },
+        ValueType::Decimal => {
+            if let Some(value) = get_low_level_value_primitive!(f32, 0.00, get_value_as_float, manager_ptr, id) {                
+                let precision: u8 = get_low_level_value_primitive!(u8, 2, get_value_float_precision, manager_ptr, id).unwrap_or(0);
+                return Some(ValueContent::Decimal(DecimalValue::from_f32(value, precision)));
+            }
+            None
+        },
+        ValueType::Int => {
+            get_low_level_value!(i32, 0, Int, get_value_as_int, manager_ptr, id)
+        },
+        ValueType::List => {
+            let nearly_unsupported = ValueList { id: id.clone() };
+            Some(ValueContent::String(nearly_unsupported.selection_as_string().unwrap_or("".into())))
+        },
+        ValueType::Short => {
+            get_low_level_value!(i16, 0, Short, get_value_as_short, manager_ptr, id)
+        },
+        ValueType::String => {
+            Some(ValueContent::String(get_value_as_string(id).unwrap_or("".into())))
+        },
+        ValueType::Button => {
+            get_low_level_value!(bool, false, Button, get_value_as_bool, manager_ptr, id)
+        },
+        // FIXME: List, Schedule and Raw are still unsupported here as I have currently no idea
+        //        of what exactly they should carry and I have no usage for that atm so I won't
+        //        invest time in this for this moment.
+        _ => None
+    }
+}
+
 impl ValueID {
     pub fn from_packed_id(home_id: u32, id: u64) -> ValueID {
         let vid = create_vid(home_id, id);
@@ -271,17 +450,10 @@ impl ValueID {
             extern_manager::get_value_label(manager_ptr, &vid, rust_string_creator)
         });
 
-        let value =
-        if label.is_empty() {
-            "<ValueRemoved>".into()
-        } else {
-            match get_value_as_string(&create_vid(home_id, id)) {
-                Ok(value) => value,
-                Err(e) => {
-                    log::error!("ValueRemoved? Unable to stringify value for label '{}', home_id={}, id0=0x{:X}, id1=0x{:X}: {:?}",  label, home_id, get_id0_from_id(id), get_id1_from_id(id), e);
-                    "<error>".into()
-                }
-            }
+        let temp_type: Option<ValueType> = (get_id0_from_id(id) as u8 & 0x0F).try_into().ok();
+        let value_type = match temp_type {
+            Some(value) => value,
+            None => ValueType::Unknown,
         };
 
         let units = recover_string(unsafe {
@@ -289,12 +461,14 @@ impl ValueID {
             extern_manager::get_value_units(manager_ptr, &vid, rust_string_creator)
         });
 
+        let value = extract_value(&create_vid(home_id, id), value_type).unwrap_or(ValueContent::Unknown);
 
         ValueID {
             home_id: home_id,
             id: id,
             genre: get_genre(get_id0_from_id(id)),
             label,
+            value_type,
             value,
             units,
         }
@@ -304,7 +478,7 @@ impl ValueID {
         &self.label
     }
 
-    pub fn value(&self) -> &str {
+    pub fn value(&self) -> &ValueContent {
         &self.value
     }
 
@@ -387,121 +561,12 @@ impl ValueID {
     }
 
     pub fn get_type(&self) -> ValueType {
-        unsafe { extern_value_id::value_id_get_type(&self.as_ozw_vid()) }
+        self.value_type
+        // unsafe { extern_value_id::value_id_get_type(&self.as_ozw_vid()) }
     }
 
     pub fn get_id(&self) -> u64 {
         self.id
-    }
-
-    pub fn as_bool(&self) -> Result<bool> {
-        match self.get_type() {
-            // The underlying library returns a value for both bool and button types.
-            ValueType::Bool | ValueType::Button => {
-                let manager_ptr = unsafe { extern_manager::get() };
-                let mut val: bool = false;
-                let res = unsafe {
-                    extern_manager::get_value_as_bool(manager_ptr, &self.as_ozw_vid(), &mut val)
-                };
-                if res {
-                    Ok(val)
-                } else {
-                    Err(Error::GetError(GetSetError::APIError("as_bool")))
-                }
-            }
-            _ => Err(Error::GetError(GetSetError::WrongType)),
-        }
-    }
-
-    pub fn as_byte(&self) -> Result<u8> {
-        if self.get_type() == ValueType::Byte {
-            let manager_ptr = unsafe { extern_manager::get() };
-            let mut val: u8 = 0;
-            let res = unsafe {
-                extern_manager::get_value_as_byte(manager_ptr, &self.as_ozw_vid(), &mut val)
-            };
-            if res {
-                Ok(val)
-            } else {
-                Err(Error::GetError(GetSetError::APIError("as_byte")))
-            }
-        } else {
-            Err(Error::GetError(GetSetError::WrongType))
-        }
-    }
-
-    pub fn as_float(&self) -> Result<f32> {
-        if self.get_type() == ValueType::Decimal {
-            let manager_ptr = unsafe { extern_manager::get() };
-            let mut val: f32 = 0.;
-            let res = unsafe {
-                extern_manager::get_value_as_float(manager_ptr, &self.as_ozw_vid(), &mut val)
-            };
-            if res {
-                Ok(val)
-            } else {
-                Err(Error::GetError(GetSetError::APIError("as_float")))
-            }
-        } else {
-            Err(Error::GetError(GetSetError::WrongType))
-        }
-    }
-
-    pub fn get_float_precision(&self) -> Result<u8> {
-        if self.get_type() == ValueType::Decimal {
-            let manager_ptr = unsafe { extern_manager::get() };
-            let mut val: u8 = 0;
-            let res = unsafe {
-                extern_manager::get_value_float_precision(manager_ptr, &self.as_ozw_vid(), &mut val)
-            };
-            if res {
-                Ok(val)
-            } else {
-                Err(Error::GetError(GetSetError::APIError(
-                    "get_float_precision",
-                )))
-            }
-        } else {
-            Err(Error::GetError(GetSetError::WrongType))
-        }
-    }
-
-    pub fn as_int(&self) -> Result<i32> {
-        if self.get_type() == ValueType::Int {
-            let manager_ptr = unsafe { extern_manager::get() };
-            let mut val: i32 = 0;
-            let res = unsafe {
-                extern_manager::get_value_as_int(manager_ptr, &self.as_ozw_vid(), &mut val)
-            };
-            if res {
-                Ok(val)
-            } else {
-                Err(Error::GetError(GetSetError::APIError("as_int")))
-            }
-        } else {
-            Err(Error::GetError(GetSetError::WrongType))
-        }
-    }
-
-    pub fn as_short(&self) -> Result<i16> {
-        if self.get_type() == ValueType::Short {
-            let manager_ptr = unsafe { extern_manager::get() };
-            let mut val: i16 = 0;
-            let res = unsafe {
-                extern_manager::get_value_as_short(manager_ptr, &self.as_ozw_vid(), &mut val)
-            };
-            if res {
-                Ok(val)
-            } else {
-                Err(Error::GetError(GetSetError::APIError("as_short")))
-            }
-        } else {
-            Err(Error::GetError(GetSetError::WrongType))
-        }
-    }
-
-    pub fn as_string(&self) -> Result<String> {
-        get_value_as_string(&self.as_ozw_vid())
     }
 
     pub fn as_raw(&self) -> Result<Box<Vec<u8>>> {
@@ -529,9 +594,10 @@ impl ValueID {
         }
     }
 
+    // TODO: ?
     pub fn as_list(&self) -> Result<ValueList> {
         if self.get_type() == ValueType::List {
-            Ok(ValueList { value_id: self })
+            Ok(ValueList { id: create_vid(self.home_id, self.id) })
         } else {
             Err(Error::GetError(GetSetError::WrongType))
         }
@@ -760,7 +826,7 @@ impl fmt::Display for ValueID {
                        self.get_command_class().map_or(String::from("???"), |cc| cc.to_string()),
                        self.get_type(),
                        self.get_label(),
-                       self.as_string().unwrap_or(String::from("???")),
+                       self.value().to_string(),
                        read_write,
                       )
               )
@@ -773,9 +839,7 @@ impl fmt::Debug for ValueID {
                    instance: {:?}, index: {:?}, type: {:?}, id: {:?}, \
                    label: {:?}, units: {:?}, help: {:?}, min: {:?}, max: {:?}, is_read_only: {:?}, \
                    is_write_only: {:?}, is_set: {:?}, is_polled: {:?}, \
-                   as_bool: {:?}, as_byte: {:?}, \
-                   as_float: {:?} (precision: {:?}), as_int: {:?}, as_short: {:?}, as_string: {:?}, as_raw: {:?}, \
-                   list: {:?} \
+                   value: {:?} \
                    }}",
                self.get_home_id(),
                self.get_node_id(),
@@ -795,15 +859,7 @@ impl fmt::Debug for ValueID {
                self.is_write_only(),
                self.is_set(),
                self.is_polled(),
-               self.as_bool().ok(),
-               self.as_byte().ok(),
-               self.as_float().ok(),
-               self.get_float_precision().ok(),
-               self.as_int().ok(),
-               self.as_short().ok(),
-               self.as_string().ok(),
-               self.as_raw().ok(),
-               self.as_list().ok()
+               self.value(),
         )
     }
 }

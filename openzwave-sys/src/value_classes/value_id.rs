@@ -1,4 +1,5 @@
 use std::convert::{TryFrom};
+use std::fmt;
 
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -25,22 +26,42 @@ impl TryFrom<u8> for ValueGenre {
 }
 
 #[repr(C)]
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
 pub enum ValueType {
     Bool = 0,
     Byte,
     Decimal,
     Int,
-    List,
-    Schedule,
+    List, //< ?
+    Schedule, //< ?
     Short,
     String,
     Button,
     Raw,
+    //
+    Unknown = 255,
     //ValueType_Max = ValueType_Raw // likely useless in Rust wrapper
 }
 
-use std::fmt;
+impl TryFrom<u8> for ValueType {
+    type Error = ();
+    fn try_from(value: u8) -> Result<ValueType, Self::Error> {
+        match value {
+            0 => Ok(Self::Bool),
+            1 => Ok(Self::Byte),
+            2 => Ok(Self::Decimal),
+            3 => Ok(Self::Int),
+            4 => Ok(Self::List),
+            5 => Ok(Self::Schedule),
+            6 => Ok(Self::Short),
+            7 => Ok(Self::String),
+            8 => Ok(Self::Button),
+            9 => Ok(Self::Raw),
+            _ => Err(()),
+        }
+    }
+}
+
 impl fmt::Display for ValueType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
