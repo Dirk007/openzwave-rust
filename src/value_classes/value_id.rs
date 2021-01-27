@@ -52,51 +52,6 @@ impl DecimalValue {
     }
 }
 
-#[cfg(test)]
-fn test_value_content() {
-    assert_eq!(
-        DecimalValue {
-            value: 230,
-            precision: 1,
-        }
-        .to_string(),
-        "23.0"
-    );
-
-    assert_eq!(
-        DecimalValue {
-            value: 2300,
-            precision: 2,
-        }
-        .to_string(),
-        "23.00"
-    );
-
-    assert_eq!(
-        DecimalValue {
-            value: 123456,
-            precision: 3,
-        }
-        .to_string(),
-        "123.456"
-    );
-
-    assert_eq!(
-        DecimalValue {
-            value: 123,
-            precision: 0,
-        }
-        .to_string(),
-        "123"
-    );
-
-    assert_eq!(DecimalValue::from_f32(123 as f32, 0).to_string(), "123");
-    assert_eq!(
-        DecimalValue::from_f32(123.45 as f32, 2).to_string(),
-        "123.45"
-    );
-}
-
 impl fmt::Display for ValueContent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {            
