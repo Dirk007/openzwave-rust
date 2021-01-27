@@ -10,6 +10,9 @@ license = "MPL-2.0"
 keywords = ["zwave"]
 edition = "2018"
 
+[features]
+default = []
+serde_serialization = ["serde"]
 
 [dependencies]
 openzwave-sys = { path = "openzwave-sys", version = "0.1.1" }
@@ -19,4 +22,6 @@ log = { version = "0.4", features = [] }
 env_logger  = { version = "0.8", features = [] }
 tokio = { version = "1.0", features = ["full"] }
 async-trait  = { version = "0.1", features = [] }
+serde = { version = "1.0", features = ["derive"], optional = true }
+
 

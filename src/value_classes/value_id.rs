@@ -3,10 +3,12 @@ use ffi::manager as extern_manager;
 use ffi::utils::res_to_result;
 use ffi::value_classes::value_id as extern_value_id;
 use libc::{c_char, c_void};
+#[cfg(feature = "serde_serialization")]
+use serde::ser::{Serialize, Serializer};
+use std::convert::TryInto;
 use std::ffi::CString;
 use std::fmt;
 use std::ptr;
-use std::convert::{TryInto};
 
 pub use ffi::value_classes::value_id::{ValueGenre, ValueType};
 
@@ -17,28 +19,38 @@ pub struct DecimalValue {
     pub precision: u8,
 }
 
+#[cfg(feature = "serde_serialization")]
+impl Serialize for DecimalValue {
+    fn serialize<S>(&self, serializer: S) -> serde::export::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_f32(self.to_f32())
+    }
+}
+
 // Rustified ValueType
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[cfg_attr(feature = "serde_serialization", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde_serialization", serde(untagged))]
 pub enum ValueContent {
     Bool(bool),
     Byte(u8),
     Decimal(DecimalValue),
     Int(i32),
-    List(String), //< ?
-    Schedule, //< ?
+    List(String), //< just supported as a string right now
+    Schedule,     //< ? unsupported yet
     Short(i16),
     String(String),
     Button(bool),
-    Raw, //< ? Vec<u8>?
+    Raw, //< ? Vec<u8>? unsupported yet
     //
     Unknown, //< null
 }
 
 impl ToString for DecimalValue {
     fn to_string(&self) -> String {
-        let shift = 10_f64.powi(self.precision as i32);
-        let value: f64 = self.value as f64 / shift;
-        format!("{:.1$}", value, self.precision as usize)
+        format!("{:.1$}", self.to_f32(), self.precision as usize)
     }
 }
 
@@ -47,16 +59,20 @@ impl DecimalValue {
         let shift = 10_f32.powi(precision as i32);
         Self {
             value: (value * shift).trunc() as i64,
-            precision
+            precision,
         }
+    }
+
+    pub fn to_f32(&self) -> f32 {
+        let shift = 10_f64.powi(self.precision as i32);
+        (self.value as f64 / shift) as f32
     }
 }
 
 impl fmt::Display for ValueContent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {            
-            Self::Bool(val) | 
-            Self::Button(val) => write!(f, "{}", val),
+        match self {
+            Self::Bool(val) | Self::Button(val) => write!(f, "{}", val),
             Self::Byte(val) => write!(f, "{}", val),
             Self::Int(val) => write!(f, "{}", val),
             Self::Short(val) => write!(f, "{}", val),
@@ -165,10 +181,10 @@ impl fmt::Display for CommandClass {
 }
 
 use crate::controller::Controller;
+use crate::node::Node;
 use ffi::utils::{
     recover_string, recover_vec, rust_string_creator, rust_string_vec_creator, rust_vec_creator,
 };
-use crate::node::Node;
 
 pub struct ValueList {
     id: extern_value_id::ValueID,
@@ -201,11 +217,7 @@ impl ValueList {
         let manager_ptr = unsafe { extern_manager::get() };
         let mut val: i32 = 0;
         let res = unsafe {
-            extern_manager::get_value_list_selection_as_int(
-                manager_ptr,
-                &self.id,
-                &mut val,
-            )
+            extern_manager::get_value_list_selection_as_int(manager_ptr, &self.id, &mut val)
         };
         if res {
             Ok(val)
@@ -305,19 +317,14 @@ fn get_value_as_string(id: &extern_value_id::ValueID) -> Result<String> {
     let mut raw_string: *mut c_char = ptr::null_mut();
 
     let res = unsafe {
-        extern_manager::get_value_as_string(
-            manager_ptr,
-            id,
-            &mut raw_string,
-            rust_string_creator,
-        )
+        extern_manager::get_value_as_string(manager_ptr, id, &mut raw_string, rust_string_creator)
     };
 
     if res {
         Ok(recover_string(raw_string))
     } else {
         Err(Error::GetError(GetSetError::APIError("as_string")))
-    }        
+    }
 }
 
 macro_rules! get_low_level_value {
@@ -362,37 +369,52 @@ fn extract_value(id: &extern_value_id::ValueID, value_type: ValueType) -> Option
     match value_type {
         ValueType::Bool => {
             get_low_level_value!(bool, false, Bool, get_value_as_bool, manager_ptr, id)
-        },
+        }
         ValueType::Byte => {
             get_low_level_value!(u8, 0, Byte, get_value_as_byte, manager_ptr, id)
-        },
+        }
         ValueType::Decimal => {
-            if let Some(value) = get_low_level_value_primitive!(f32, 0.00, get_value_as_float, manager_ptr, id) {                
-                let precision: u8 = get_low_level_value_primitive!(u8, 2, get_value_float_precision, manager_ptr, id).unwrap_or(0);
-                return Some(ValueContent::Decimal(DecimalValue::from_f32(value, precision)));
+            if let Some(value) =
+                get_low_level_value_primitive!(f32, 0.00, get_value_as_float, manager_ptr, id)
+            {
+                let precision: u8 = get_low_level_value_primitive!(
+                    u8,
+                    2,
+                    get_value_float_precision,
+                    manager_ptr,
+                    id
+                )
+                .unwrap_or(0);
+                return Some(ValueContent::Decimal(DecimalValue::from_f32(
+                    value, precision,
+                )));
             }
             None
-        },
+        }
         ValueType::Int => {
             get_low_level_value!(i32, 0, Int, get_value_as_int, manager_ptr, id)
-        },
+        }
         ValueType::List => {
             let nearly_unsupported = ValueList { id: id.clone() };
-            Some(ValueContent::String(nearly_unsupported.selection_as_string().unwrap_or("".into())))
-        },
+            Some(ValueContent::String(
+                nearly_unsupported
+                    .selection_as_string()
+                    .unwrap_or("".into()),
+            ))
+        }
         ValueType::Short => {
             get_low_level_value!(i16, 0, Short, get_value_as_short, manager_ptr, id)
-        },
-        ValueType::String => {
-            Some(ValueContent::String(get_value_as_string(id).unwrap_or("".into())))
-        },
+        }
+        ValueType::String => Some(ValueContent::String(
+            get_value_as_string(id).unwrap_or("".into()),
+        )),
         ValueType::Button => {
             get_low_level_value!(bool, false, Button, get_value_as_bool, manager_ptr, id)
-        },
+        }
         // FIXME: List, Schedule and Raw are still unsupported here as I have currently no idea
         //        of what exactly they should carry and I have no usage for that atm so I won't
         //        invest time in this for this moment.
-        _ => None
+        _ => None,
     }
 }
 
@@ -416,7 +438,8 @@ impl ValueID {
             extern_manager::get_value_units(manager_ptr, &vid, rust_string_creator)
         });
 
-        let value = extract_value(&create_vid(home_id, id), value_type).unwrap_or(ValueContent::Unknown);
+        let value =
+            extract_value(&create_vid(home_id, id), value_type).unwrap_or(ValueContent::Unknown);
 
         ValueID {
             home_id: home_id,
@@ -442,7 +465,7 @@ impl ValueID {
     }
 
     pub fn as_ozw_vid(&self) -> extern_value_id::ValueID {
-        create_vid(self.home_id, self. id)
+        create_vid(self.home_id, self.id)
     }
 
     /*
@@ -552,7 +575,9 @@ impl ValueID {
     // TODO: ?
     pub fn as_list(&self) -> Result<ValueList> {
         if self.get_type() == ValueType::List {
-            Ok(ValueList { id: create_vid(self.home_id, self.id) })
+            Ok(ValueList {
+                id: create_vid(self.home_id, self.id),
+            })
         } else {
             Err(Error::GetError(GetSetError::WrongType))
         }
@@ -790,31 +815,33 @@ impl fmt::Display for ValueID {
 
 impl fmt::Debug for ValueID {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ValueID {{ home_id: {:?}, node_id: {:?}, genre: {:?}({:?}), command_class: {:?}, \
+        write!(
+            f,
+            "ValueID {{ home_id: {:?}, node_id: {:?}, genre: {:?}({:?}), command_class: {:?}, \
                    instance: {:?}, index: {:?}, type: {:?}, id: {:?}, \
                    label: {:?}, units: {:?}, help: {:?}, min: {:?}, max: {:?}, is_read_only: {:?}, \
                    is_write_only: {:?}, is_set: {:?}, is_polled: {:?}, \
                    value: {:?} \
                    }}",
-               self.get_home_id(),
-               self.get_node_id(),
-               self.get_genre(),
-               self.genre,
-               self.get_command_class(),
-               self.get_instance(),
-               self.get_index(),
-               self.get_type(),
-               self.get_id(),
-               self.get_label(),
-               self.get_units(),
-               self.get_help(),
-               self.get_min(),
-               self.get_max(),
-               self.is_read_only(),
-               self.is_write_only(),
-               self.is_set(),
-               self.is_polled(),
-               self.value(),
+            self.get_home_id(),
+            self.get_node_id(),
+            self.get_genre(),
+            self.genre,
+            self.get_command_class(),
+            self.get_instance(),
+            self.get_index(),
+            self.get_type(),
+            self.get_id(),
+            self.get_label(),
+            self.get_units(),
+            self.get_help(),
+            self.get_min(),
+            self.get_max(),
+            self.is_read_only(),
+            self.is_write_only(),
+            self.is_set(),
+            self.is_polled(),
+            self.value(),
         )
     }
 }
