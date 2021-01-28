@@ -4,7 +4,7 @@ use ffi::utils::res_to_result;
 use ffi::value_classes::value_id as extern_value_id;
 use libc::{c_char, c_void};
 #[cfg(feature = "serde_serialization")]
-use serde::ser::{Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
 use std::ffi::CString;
 use std::fmt;
@@ -17,6 +17,27 @@ pub use ffi::value_classes::value_id::{ValueGenre, ValueType};
 pub struct DecimalValue {
     pub value: i64,
     pub precision: u8,
+}
+
+#[cfg(feature = "serde_serialization")]
+#[allow(unused)]
+fn deserialize_decimal_value<'de, D>(deserializer: D) -> serde::export::Result<DecimalValue, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: &str = Deserialize::deserialize(deserializer)?;
+    let value: f32 = serde_json::from_str(s).unwrap_or(0_f32);
+
+    // Quick & ugly hack for the precision...
+    let temp = format!("{}", value.fract());
+    let precision = temp.split('.')
+        .collect::<Vec<&str>>()
+        .last()
+        .unwrap_or(&"")
+        .find('0')
+        .unwrap_or(0);
+
+    serde::export::Ok(DecimalValue::from_f32(value, precision as u8))
 }
 
 #[cfg(feature = "serde_serialization")]
@@ -36,6 +57,7 @@ impl Serialize for DecimalValue {
 pub enum ValueContent {
     Bool(bool),
     Byte(u8),
+    #[cfg_attr(feature = "serde_serialization", serde(deserialize_with="deserialize_decimal_value"))]
     Decimal(DecimalValue),
     Int(i32),
     List(String), //< just supported as a string right now
