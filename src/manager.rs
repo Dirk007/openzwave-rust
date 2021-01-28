@@ -216,32 +216,32 @@ impl Manager {
         unsafe {
             extern_manager::manager_enable_poll_with_intensity(
                 self.ptr,
-                &vid.as_ozw_vid(),
+                vid.vid(),
                 intensity,
             )
         }
     }
 
     pub fn enable_poll(&self, vid: &ValueID) -> bool {
-        unsafe { extern_manager::manager_enable_poll(self.ptr, &vid.as_ozw_vid()) }
+        unsafe { extern_manager::manager_enable_poll(self.ptr, vid.vid()) }
     }
 
     pub fn disable_poll(&self, vid: &ValueID) -> bool {
-        unsafe { extern_manager::manager_disable_poll(self.ptr, &vid.as_ozw_vid()) }
+        unsafe { extern_manager::manager_disable_poll(self.ptr, vid.vid()) }
     }
 
     pub fn is_polled(&self, vid: &ValueID) -> bool {
-        unsafe { extern_manager::manager_is_polled(self.ptr, &vid.as_ozw_vid()) }
+        unsafe { extern_manager::manager_is_polled(self.ptr, vid.vid()) }
     }
 
     pub fn set_poll_intensity(&self, vid: &ValueID, intensity: u8) {
         unsafe {
-            extern_manager::manager_set_poll_intensity(self.ptr, &vid.as_ozw_vid(), intensity)
+            extern_manager::manager_set_poll_intensity(self.ptr, vid.vid(), intensity)
         }
     }
 
     pub fn get_poll_intensity(&self, vid: &ValueID) -> u8 {
-        unsafe { extern_manager::manager_get_poll_intensity(self.ptr, &vid.as_ozw_vid()) }
+        unsafe { extern_manager::manager_get_poll_intensity(self.ptr, vid.vid()) }
     }
 }
 

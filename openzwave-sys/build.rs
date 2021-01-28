@@ -65,7 +65,7 @@ fn main() {
     target_specific_work(&openzwave_build_dir);
 
     // then build our thin wrapper
-    let c = cc::Build::new()
+    let _c = cc::Build::new()
         .file("openzwave-c/options.cc")
         .file("openzwave-c/manager.cc")
         .file("openzwave-c/notification.cc")

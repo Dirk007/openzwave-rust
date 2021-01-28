@@ -12,10 +12,10 @@ use std::ptr;
 
 pub use ffi::value_classes::value_id::{ValueGenre, ValueType};
 
-// Helper to have a hashable float
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+// Helper to have a correct representation with a fixed precision
+#[derive(Debug, Clone)]
 pub struct DecimalValue {
-    pub value: i64,
+    pub value: f32,
     pub precision: u8,
 }
 
@@ -51,7 +51,7 @@ impl Serialize for DecimalValue {
 }
 
 // Rustified ValueType
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde_serialization", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde_serialization", serde(untagged))]
 pub enum ValueContent {
@@ -72,22 +72,20 @@ pub enum ValueContent {
 
 impl ToString for DecimalValue {
     fn to_string(&self) -> String {
-        format!("{:.1$}", self.to_f32(), self.precision as usize)
+        format!("{:.1$}", self.value, self.precision as usize)
     }
 }
 
 impl DecimalValue {
     pub fn from_f32(value: f32, precision: u8) -> Self {
-        let shift = 10_f32.powi(precision as i32);
         Self {
-            value: (value * shift).trunc() as i64,
+            value,
             precision,
         }
     }
 
     pub fn to_f32(&self) -> f32 {
-        let shift = 10_f64.powi(self.precision as i32);
-        (self.value as f64 / shift) as f32
+        self.value
     }
 }
 
@@ -300,10 +298,9 @@ impl fmt::Debug for ValueList {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Hash)]
+#[derive(Clone)]
 pub struct ValueID {
-    home_id: u32,
-    id: u64,
+    vid: extern_value_id::ValueID,
     genre: Option<ValueGenre>,
     label: String,
     value_type: ValueType,
@@ -330,7 +327,11 @@ fn get_genre(id: u32) -> Option<ValueGenre> {
 }
 
 fn create_vid(home_id: u32, id: u64) -> extern_value_id::ValueID {
-    unsafe { extern_value_id::value_id_from_packed_id(home_id, id) }
+    extern_value_id::ValueID {
+        home_id,
+        id: get_id0_from_id(id),
+        id1: get_id1_from_id(id),
+    }
 }
 
 fn get_value_as_string(id: &extern_value_id::ValueID) -> Result<String> {
@@ -433,7 +434,7 @@ fn extract_value(id: &extern_value_id::ValueID, value_type: ValueType) -> Option
         ValueType::Button => {
             get_low_level_value!(bool, false, Button, get_value_as_bool, manager_ptr, id)
         }
-        // FIXME: List, Schedule and Raw are still unsupported here as I have currently no idea
+        // FIXME: List(partially), Schedule and Raw are still unsupported here as I have currently no idea
         //        of what exactly they should carry and I have no usage for that atm so I won't
         //        invest time in this for this moment.
         _ => None,
@@ -461,11 +462,10 @@ impl ValueID {
         });
 
         let value =
-            extract_value(&create_vid(home_id, id), value_type).unwrap_or(ValueContent::Unknown);
+            extract_value(&vid, value_type).unwrap_or(ValueContent::Unknown);
 
         ValueID {
-            home_id: home_id,
-            id: id,
+            vid,
             genre: get_genre(get_id0_from_id(id)),
             label,
             value_type,
@@ -486,66 +486,29 @@ impl ValueID {
         &self.units
     }
 
-    pub fn as_ozw_vid(&self) -> extern_value_id::ValueID {
-        create_vid(self.home_id, self.id)
-    }
-
-    /*
-    pub fn from_values(
-        home_id: u32,
-        node_id: u8,
-        genre: ValueGenre,
-        command_class_id: u8,
-        instance: u8,
-        value_index: u8,
-        value_type: ValueType,
-    ) -> ValueID {
-        let ozw_vid = unsafe {
-            extern_value_id::value_id_from_values(
-                home_id,
-                node_id,
-                genre,
-                command_class_id,
-                instance,
-                value_index,
-                value_type,
-            )
-        };
-        let id = unsafe { extern_value_id::value_id_get_id(&ozw_vid) };
-        let genre = get_genre(get_id0_from_id(id));
-        ValueID {
-            home_id: unsafe { extern_value_id::value_id_get_home_id(&ozw_vid) },
-            id,
-            genre,
-            label: "".into(),
-        }
-    }
-    */
-
     // instance methods
     pub fn get_controller(&self) -> Controller {
-        Controller::new(self.home_id)
+        Controller::new(self.vid.home_id)
     }
 
     pub fn get_node(&self) -> Node {
-        Node::from_id(self.home_id, self.get_node_id())
+        Node::from_id(self.vid.home_id, self.get_node_id())
     }
 
     pub fn get_home_id(&self) -> u32 {
-        self.home_id
+        self.vid.home_id
     }
 
     pub fn get_node_id(&self) -> u8 {
-        unsafe { extern_value_id::value_id_get_node_id(&self.as_ozw_vid()) }
+        (self.vid.id >> 24) as u8
     }
 
     pub fn get_genre(&self) -> Option<ValueGenre> {
-        // unsafe { extern_value_id::value_id_get_genre(&self.as_ozw_vid()) }
         self.genre
     }
 
     pub fn get_command_class_id(&self) -> u8 {
-        unsafe { extern_value_id::value_id_get_command_class_id(&self.as_ozw_vid()) }
+        ((self.vid.id & 0x003fc000) >> 14) as u8
     }
 
     pub fn get_command_class(&self) -> Option<CommandClass> {
@@ -553,20 +516,19 @@ impl ValueID {
     }
 
     pub fn get_instance(&self) -> u8 {
-        unsafe { extern_value_id::value_id_get_instance(&self.as_ozw_vid()) }
+        ((self.vid.id & 0xff0) >> 4) as u8
     }
 
     pub fn get_index(&self) -> u8 {
-        unsafe { extern_value_id::value_id_get_index(&self.as_ozw_vid()) }
+        ((self.vid.id & 0xFFFF0000) >> 16) as u8
     }
 
     pub fn get_type(&self) -> ValueType {
         self.value_type
-        // unsafe { extern_value_id::value_id_get_type(&self.as_ozw_vid()) }
     }
 
-    pub fn get_id(&self) -> u64 {
-        self.id
+    pub fn vid(&self) -> &extern_value_id::ValueID {
+        &self.vid
     }
 
     pub fn as_raw(&self) -> Result<Box<Vec<u8>>> {
@@ -578,7 +540,7 @@ impl ValueID {
             let res = unsafe {
                 extern_manager::get_value_as_raw(
                     manager_ptr,
-                    &self.as_ozw_vid(),
+                    &self.vid,
                     raw_ptr_c_void,
                     rust_vec_creator::<u8>,
                 )
@@ -598,7 +560,7 @@ impl ValueID {
     pub fn as_list(&self) -> Result<ValueList> {
         if self.get_type() == ValueType::List {
             Ok(ValueList {
-                id: create_vid(self.home_id, self.id),
+                id: self.vid,
             })
         } else {
             Err(Error::GetError(GetSetError::WrongType))
@@ -610,7 +572,7 @@ impl ValueID {
             ValueType::Bool | ValueType::Button => {
                 let manager_ptr = unsafe { extern_manager::get() };
                 res_to_result(unsafe {
-                    extern_manager::set_value_bool(manager_ptr, &self.as_ozw_vid(), value)
+                    extern_manager::set_value_bool(manager_ptr, &self.vid, value)
                 })
                 .or(Err(Error::SetError(GetSetError::APIError("set_bool"))))
             }
@@ -622,7 +584,7 @@ impl ValueID {
         if self.get_type() == ValueType::Byte {
             let manager_ptr = unsafe { extern_manager::get() };
             res_to_result(unsafe {
-                extern_manager::set_value_byte(manager_ptr, &self.as_ozw_vid(), value)
+                extern_manager::set_value_byte(manager_ptr, &self.vid, value)
             })
             .or(Err(Error::SetError(GetSetError::APIError("set_byte"))))
         } else {
@@ -634,7 +596,7 @@ impl ValueID {
         if self.get_type() == ValueType::Decimal {
             let manager_ptr = unsafe { extern_manager::get() };
             res_to_result(unsafe {
-                extern_manager::set_value_float(manager_ptr, &self.as_ozw_vid(), value)
+                extern_manager::set_value_float(manager_ptr, &self.vid, value)
             })
             .or(Err(Error::SetError(GetSetError::APIError("set_float"))))
         } else {
@@ -646,7 +608,7 @@ impl ValueID {
         if self.get_type() == ValueType::Int {
             let manager_ptr = unsafe { extern_manager::get() };
             res_to_result(unsafe {
-                extern_manager::set_value_int(manager_ptr, &self.as_ozw_vid(), value)
+                extern_manager::set_value_int(manager_ptr, &self.vid, value)
             })
             .or(Err(Error::SetError(GetSetError::APIError("set_int"))))
         } else {
@@ -658,7 +620,7 @@ impl ValueID {
         if self.get_type() == ValueType::Short {
             let manager_ptr = unsafe { extern_manager::get() };
             res_to_result(unsafe {
-                extern_manager::set_value_short(manager_ptr, &self.as_ozw_vid(), value)
+                extern_manager::set_value_short(manager_ptr, &self.vid, value)
             })
             .or(Err(Error::SetError(GetSetError::APIError("set_short"))))
         } else {
@@ -671,7 +633,7 @@ impl ValueID {
         let manager_ptr = unsafe { extern_manager::get() };
         let c_string = CString::new(value)?;
         res_to_result(unsafe {
-            extern_manager::set_value_string(manager_ptr, &self.as_ozw_vid(), c_string.as_ptr())
+            extern_manager::set_value_string(manager_ptr, &self.vid, c_string.as_ptr())
         })
         .or(Err(Error::SetError(GetSetError::APIError("set_string"))))
     }
@@ -682,7 +644,7 @@ impl ValueID {
             res_to_result(unsafe {
                 extern_manager::set_value_raw(
                     manager_ptr,
-                    &self.as_ozw_vid(),
+                    &self.vid,
                     value.as_ptr(),
                     value.len() as u8,
                 )
@@ -700,7 +662,7 @@ impl ValueID {
             res_to_result(unsafe {
                 extern_manager::set_value_list_selection_string(
                     manager_ptr,
-                    &self.as_ozw_vid(),
+                    &self.vid,
                     c_string.as_ptr(),
                 )
             })
@@ -715,7 +677,7 @@ impl ValueID {
     pub fn get_label(&self) -> String {
         recover_string(unsafe {
             let manager_ptr = extern_manager::get();
-            extern_manager::get_value_label(manager_ptr, &self.as_ozw_vid(), rust_string_creator)
+            extern_manager::get_value_label(manager_ptr, &self.vid, rust_string_creator)
         })
     }
 
@@ -723,7 +685,7 @@ impl ValueID {
         unsafe {
             let manager_ptr = extern_manager::get();
             let c_string = CString::new(str)?.as_ptr();
-            extern_manager::set_value_label(manager_ptr, &self.as_ozw_vid(), c_string);
+            extern_manager::set_value_label(manager_ptr, &self.vid, c_string);
             Ok(())
         }
     }
@@ -731,7 +693,7 @@ impl ValueID {
     pub fn get_units(&self) -> String {
         recover_string(unsafe {
             let manager_ptr = extern_manager::get();
-            extern_manager::get_value_units(manager_ptr, &self.as_ozw_vid(), rust_string_creator)
+            extern_manager::get_value_units(manager_ptr, &self.vid, rust_string_creator)
         })
     }
 
@@ -739,7 +701,7 @@ impl ValueID {
         unsafe {
             let manager_ptr = extern_manager::get();
             let c_string = CString::new(str)?.as_ptr();
-            extern_manager::set_value_units(manager_ptr, &self.as_ozw_vid(), c_string);
+            extern_manager::set_value_units(manager_ptr, &self.vid, c_string);
             Ok(())
         }
     }
@@ -747,7 +709,7 @@ impl ValueID {
     pub fn get_help(&self) -> String {
         recover_string(unsafe {
             let manager_ptr = extern_manager::get();
-            extern_manager::get_value_help(manager_ptr, &self.as_ozw_vid(), rust_string_creator)
+            extern_manager::get_value_help(manager_ptr, &self.vid, rust_string_creator)
         })
     }
 
@@ -755,7 +717,7 @@ impl ValueID {
         unsafe {
             let manager_ptr = extern_manager::get();
             let c_string = CString::new(str)?.as_ptr();
-            extern_manager::set_value_help(manager_ptr, &self.as_ozw_vid(), c_string);
+            extern_manager::set_value_help(manager_ptr, &self.vid, c_string);
             Ok(())
         }
     }
@@ -763,42 +725,42 @@ impl ValueID {
     pub fn get_min(&self) -> i32 {
         unsafe {
             let manager_ptr = extern_manager::get();
-            extern_manager::get_value_min(manager_ptr, &self.as_ozw_vid())
+            extern_manager::get_value_min(manager_ptr, &self.vid)
         }
     }
 
     pub fn get_max(&self) -> i32 {
         unsafe {
             let manager_ptr = extern_manager::get();
-            extern_manager::get_value_max(manager_ptr, &self.as_ozw_vid())
+            extern_manager::get_value_max(manager_ptr, &self.vid)
         }
     }
 
     pub fn is_read_only(&self) -> bool {
         unsafe {
             let manager_ptr = extern_manager::get();
-            extern_manager::is_value_read_only(manager_ptr, &self.as_ozw_vid())
+            extern_manager::is_value_read_only(manager_ptr, &self.vid)
         }
     }
 
     pub fn is_write_only(&self) -> bool {
         unsafe {
             let manager_ptr = extern_manager::get();
-            extern_manager::is_value_write_only(manager_ptr, &self.as_ozw_vid())
+            extern_manager::is_value_write_only(manager_ptr, &self.vid)
         }
     }
 
     pub fn is_set(&self) -> bool {
         unsafe {
             let manager_ptr = extern_manager::get();
-            extern_manager::is_value_set(manager_ptr, &self.as_ozw_vid())
+            extern_manager::is_value_set(manager_ptr, &self.vid)
         }
     }
 
     pub fn is_polled(&self) -> bool {
         unsafe {
             let manager_ptr = extern_manager::get();
-            extern_manager::is_value_polled(manager_ptr, &self.as_ozw_vid())
+            extern_manager::is_value_polled(manager_ptr, &self.vid)
         }
     }
 }
@@ -819,9 +781,10 @@ impl fmt::Display for ValueID {
             "RW"
         };
 
-        f.pad(&format!("HomeId: {:08x} ID: {:016x} NodeId: {:3} {:30} CC: ({:3}) {:20} Type: {:8} Label: {:20} Value: {:8} ({})",
+        f.pad(&format!("HomeId: {:08x} ID: {:08x}{:08x} NodeId: {:3} {:30} CC: ({:3}) {:20} Type: {:8} Label: {:20} Value: {:8} ({})",
                        self.get_home_id(),
-                       self.get_id(),
+                       self.vid.id1,
+                       self.vid.id,
                        self.get_node_id(),
                        node_name,
                        self.get_command_class_id(),
@@ -840,12 +803,12 @@ impl fmt::Debug for ValueID {
         write!(
             f,
             "ValueID {{ home_id: {:?}, node_id: {:?}, genre: {:?}({:?}), command_class: {:?}, \
-                   instance: {:?}, index: {:?}, type: {:?}, id: {:?}, \
+                   instance: {:?}, index: {:?}, type: {:?}, id: {:?}{:?}, \
                    label: {:?}, units: {:?}, help: {:?}, min: {:?}, max: {:?}, is_read_only: {:?}, \
                    is_write_only: {:?}, is_set: {:?}, is_polled: {:?}, \
                    value: {:?} \
                    }}",
-            self.get_home_id(),
+            self.vid.home_id,
             self.get_node_id(),
             self.get_genre(),
             self.genre,
@@ -853,7 +816,8 @@ impl fmt::Debug for ValueID {
             self.get_instance(),
             self.get_index(),
             self.get_type(),
-            self.get_id(),
+            self.vid.id1,
+            self.vid.id,
             self.get_label(),
             self.get_units(),
             self.get_help(),
@@ -865,27 +829,5 @@ impl fmt::Debug for ValueID {
             self.is_polled(),
             self.value(),
         )
-    }
-}
-
-use std::cmp::{self, Ordering};
-
-impl cmp::PartialOrd for ValueID {
-    fn partial_cmp(&self, other: &ValueID) -> Option<Ordering> {
-        let is_less_than =
-            unsafe { extern_value_id::value_id_less_than(&self.as_ozw_vid(), &other.as_ozw_vid()) };
-        if is_less_than {
-            Some(Ordering::Less)
-        } else if self.eq(other) {
-            Some(Ordering::Equal)
-        } else {
-            Some(Ordering::Greater)
-        }
-    }
-}
-
-impl cmp::Ord for ValueID {
-    fn cmp(&self, other: &ValueID) -> Ordering {
-        self.partial_cmp(other).unwrap()
     }
 }

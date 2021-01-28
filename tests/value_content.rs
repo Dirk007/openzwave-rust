@@ -7,7 +7,7 @@ mod test {
     fn test_decimal_value() {
         assert_eq!(
             DecimalValue {
-                value: 230,
+                value: 23_f32,
                 precision: 1,
             }
             .to_string(),
@@ -16,7 +16,7 @@ mod test {
 
         assert_eq!(
             DecimalValue {
-                value: 2300,
+                value: 23_f32,
                 precision: 2,
             }
             .to_string(),
@@ -25,7 +25,7 @@ mod test {
 
         assert_eq!(
             DecimalValue {
-                value: 123456,
+                value: 123.456123_f32,
                 precision: 3,
             }
             .to_string(),
@@ -34,18 +34,15 @@ mod test {
 
         assert_eq!(
             DecimalValue {
-                value: 123,
+                value: 123.123_f32,
                 precision: 0,
             }
             .to_string(),
             "123"
         );
 
-        assert_eq!(DecimalValue::from_f32(123 as f32, 0).to_string(), "123");
-        assert_eq!(
-            DecimalValue::from_f32(123.45 as f32, 2).to_string(),
-            "123.45"
-        );
+        assert_eq!(DecimalValue::from_f32(123_f32, 0).to_string(), "123");
+        assert_eq!(DecimalValue::from_f32(123.45_f32, 2).to_string(), "123.45");
     }
 
     #[test]
