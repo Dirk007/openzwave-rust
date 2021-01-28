@@ -14,12 +14,11 @@ pub enum ControllerInterface {
 }
 
 pub use self::{
-    manager_reset_controller as reset_controller,
-    manager_soft_reset_controller as soft_reset_controller,
-    manager_cancel_controller_command as cancel_controller_command,
     manager_add_driver as add_driver, manager_add_node as add_node,
-    manager_add_watcher as add_watcher, manager_create as create, manager_destroy as destroy,
-    manager_disable_poll as disable_poll, manager_enable_poll as enable_poll,
+    manager_add_watcher as add_watcher,
+    manager_cancel_controller_command as cancel_controller_command, manager_create as create,
+    manager_destroy as destroy, manager_disable_poll as disable_poll,
+    manager_enable_poll as enable_poll,
     manager_enable_poll_with_intensity as enable_poll_with_intensity, manager_get as get,
     manager_get_controller_interface_type as get_controller_interface_type,
     manager_get_controller_node_id as get_controller_node_id,
@@ -75,7 +74,7 @@ pub use self::{
     manager_node_is_security_device as is_node_security_device,
     manager_node_is_zwave_plus as is_node_zwave_plus, manager_remove_driver as remove_driver,
     manager_remove_node as remove_node, manager_remove_watcher as remove_watcher,
-    manager_set_poll_intensity as set_poll_intensity,
+    manager_reset_controller as reset_controller, manager_set_poll_intensity as set_poll_intensity,
     manager_set_poll_interval as set_poll_interval, manager_set_value_bool as set_value_bool,
     manager_set_value_byte as set_value_byte, manager_set_value_float as set_value_float,
     manager_set_value_help as set_value_help, manager_set_value_int as set_value_int,
@@ -83,8 +82,8 @@ pub use self::{
     manager_set_value_list_selection_string as set_value_list_selection_string,
     manager_set_value_raw as set_value_raw, manager_set_value_short as set_value_short,
     manager_set_value_string as set_value_string, manager_set_value_units as set_value_units,
-    manager_test_network as test_network, manager_test_network_node as test_network_node,
-    manager_write_config as write_config,
+    manager_soft_reset_controller as soft_reset_controller, manager_test_network as test_network,
+    manager_test_network_node as test_network_node,
 };
 
 extern "C" {
@@ -94,7 +93,6 @@ extern "C" {
     pub fn manager_reset_controller(manager: *mut Manager, home_id: u32);
     pub fn manager_soft_reset_controller(manager: *mut Manager, home_id: u32);
     pub fn manager_cancel_controller_command(manager: *mut Manager, home_id: u32);
-    pub fn manager_write_config(manager: *mut Manager, home_id: u32);
     pub fn manager_add_node(manager: *mut Manager, home_id: u32, secure: bool) -> bool;
     pub fn manager_remove_node(manager: *mut Manager, home_id: u32) -> bool;
     pub fn manager_test_network_node(manager: *mut Manager, home_id: u32, node_id: u8, count: u32);

@@ -28,10 +28,6 @@ void manager_reset_controller(Manager * manager, uint32 home_id) {
   manager->ResetController(home_id);
 }
 
-void manager_write_config(Manager * manager, uint32 home_id) {
-  manager->WriteConfig(home_id);
-}
-
 bool manager_add_node(Manager * manager, uint32 home_id, bool secure) {
   return manager->AddNode(home_id, secure);
 }

@@ -1,10 +1,10 @@
 use ffi::manager as extern_manager;
+use ffi::utils::{recover_string, rust_string_creator};
 use libc::c_char;
-use ffi::utils::{ rust_string_creator, recover_string };
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct Controller {
-    home_id: u32
+    home_id: u32,
 }
 
 macro_rules! network_impl {
@@ -35,9 +35,7 @@ macro_rules! network_impl_string {
 
 impl Controller {
     pub fn new(home_id: u32) -> Controller {
-        Controller {
-            home_id: home_id
-        }
+        Controller { home_id: home_id }
     }
 
     pub fn get_home_id(&self) -> u32 {
@@ -51,7 +49,6 @@ impl Controller {
         is_bridge_controller -> bool,
         get_send_queue_count -> i32,
         log_driver_statistics -> (),
-        write_config -> (),
         get_controller_interface_type -> extern_manager::ControllerInterface
     }
 
@@ -62,15 +59,17 @@ impl Controller {
     }
 }
 
-use std::fmt::{ self, Debug, Display, Formatter };
+use std::fmt::{self, Debug, Display, Formatter};
 
 impl Display for Controller {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.pad(&format!("{}: HomeId: {:08x} Node: {} Path: {}",
-                       self.get_library_type_name(),
-                       self.get_home_id(),
-                       self.get_controller_node_id(),
-                       self.get_controller_path()))
+        f.pad(&format!(
+            "{}: HomeId: {:08x} Node: {} Path: {}",
+            self.get_library_type_name(),
+            self.get_home_id(),
+            self.get_controller_node_id(),
+            self.get_controller_path()
+        ))
     }
 }
 

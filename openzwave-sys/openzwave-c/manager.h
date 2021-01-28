@@ -14,7 +14,6 @@ typedef OpenZWave::ValueID ValueID;
 Manager * manager_create();
 Manager * manager_get();
 void manager_destroy();
-void manager_write_config(Manager * manager, uint32 home_id);
 
 // Controller functions
 void manager_reset_controller(Manager * manager, uint32 home_id);
