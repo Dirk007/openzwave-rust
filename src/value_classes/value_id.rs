@@ -1,4 +1,4 @@
-use crate::error::{Error, GetSetError, Result};
+use crate::error::{Error, GetSetError, Result as ZWaveResult};
 use ffi::manager as extern_manager;
 use ffi::utils::res_to_result;
 use ffi::value_classes::value_id as extern_value_id;
@@ -21,7 +21,7 @@ pub struct DecimalValue {
 
 #[cfg(feature = "serde_serialization")]
 #[allow(unused)]
-fn deserialize_decimal_value<'de, D>(deserializer: D) -> serde::export::Result<DecimalValue, D::Error>
+fn deserialize_decimal_value<'de, D>(deserializer: D) -> Result<DecimalValue, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -37,12 +37,12 @@ where
         .find('0')
         .unwrap_or(0);
 
-    serde::export::Ok(DecimalValue::from_f32(value, precision as u8))
+    Ok(DecimalValue::from_f32(value, precision as u8))
 }
 
 #[cfg(feature = "serde_serialization")]
 impl Serialize for DecimalValue {
-    fn serialize<S>(&self, serializer: S) -> serde::export::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -211,7 +211,7 @@ pub struct ValueList {
 }
 
 impl ValueList {
-    pub fn selection_as_string(&self) -> Result<String> {
+    pub fn selection_as_string(&self) -> ZWaveResult<String> {
         let manager_ptr = unsafe { extern_manager::get() };
         let mut raw_string: *mut c_char = ptr::null_mut();
 
@@ -233,7 +233,7 @@ impl ValueList {
         }
     }
 
-    pub fn selection_as_int(&self) -> Result<i32> {
+    pub fn selection_as_int(&self) -> ZWaveResult<i32> {
         let manager_ptr = unsafe { extern_manager::get() };
         let mut val: i32 = 0;
         let res = unsafe {
@@ -248,7 +248,7 @@ impl ValueList {
         }
     }
 
-    pub fn items(&self) -> Result<Box<Vec<String>>> {
+    pub fn items(&self) -> ZWaveResult<Box<Vec<String>>> {
         let manager_ptr = unsafe { extern_manager::get() };
         let mut c_items: *mut Vec<String> = ptr::null_mut();
         let c_items_void_ptr = &mut c_items as *mut *mut _ as *mut *mut c_void;
@@ -267,7 +267,7 @@ impl ValueList {
         }
     }
 
-    pub fn values(&self) -> Result<Box<Vec<i32>>> {
+    pub fn values(&self) -> ZWaveResult<Box<Vec<i32>>> {
         let manager_ptr = unsafe { extern_manager::get() };
         let mut c_values: *mut Vec<i32> = ptr::null_mut();
         let c_values_void_ptr = &mut c_values as *mut *mut _ as *mut *mut c_void;
@@ -334,7 +334,7 @@ fn create_vid(home_id: u32, id: u64) -> extern_value_id::ValueID {
     }
 }
 
-fn get_value_as_string(id: &extern_value_id::ValueID) -> Result<String> {
+fn get_value_as_string(id: &extern_value_id::ValueID) -> ZWaveResult<String> {
     // The underlying C++ lib returns a value for any type.
     let manager_ptr = unsafe { extern_manager::get() };
     let mut raw_string: *mut c_char = ptr::null_mut();
@@ -531,7 +531,7 @@ impl ValueID {
         &self.vid
     }
 
-    pub fn as_raw(&self) -> Result<Box<Vec<u8>>> {
+    pub fn as_raw(&self) -> ZWaveResult<Box<Vec<u8>>> {
         if self.get_type() == ValueType::Raw {
             let mut raw_ptr: *mut Vec<u8> = ptr::null_mut();
             let raw_ptr_c_void = &mut raw_ptr as *mut *mut _ as *mut *mut c_void;
@@ -557,7 +557,7 @@ impl ValueID {
     }
 
     // TODO: ?
-    pub fn as_list(&self) -> Result<ValueList> {
+    pub fn as_list(&self) -> ZWaveResult<ValueList> {
         if self.get_type() == ValueType::List {
             Ok(ValueList {
                 id: self.vid,
@@ -567,7 +567,7 @@ impl ValueID {
         }
     }
 
-    pub fn set_bool(&self, value: bool) -> Result<()> {
+    pub fn set_bool(&self, value: bool) -> ZWaveResult<()> {
         match self.get_type() {
             ValueType::Bool | ValueType::Button => {
                 let manager_ptr = unsafe { extern_manager::get() };
@@ -580,7 +580,7 @@ impl ValueID {
         }
     }
 
-    pub fn set_byte(&self, value: u8) -> Result<()> {
+    pub fn set_byte(&self, value: u8) -> ZWaveResult<()> {
         if self.get_type() == ValueType::Byte {
             let manager_ptr = unsafe { extern_manager::get() };
             res_to_result(unsafe {
@@ -592,7 +592,7 @@ impl ValueID {
         }
     }
 
-    pub fn set_float(&self, value: f32) -> Result<()> {
+    pub fn set_float(&self, value: f32) -> ZWaveResult<()> {
         if self.get_type() == ValueType::Decimal {
             let manager_ptr = unsafe { extern_manager::get() };
             res_to_result(unsafe {
@@ -604,7 +604,7 @@ impl ValueID {
         }
     }
 
-    pub fn set_int(&self, value: i32) -> Result<()> {
+    pub fn set_int(&self, value: i32) -> ZWaveResult<()> {
         if self.get_type() == ValueType::Int {
             let manager_ptr = unsafe { extern_manager::get() };
             res_to_result(unsafe {
@@ -616,7 +616,7 @@ impl ValueID {
         }
     }
 
-    pub fn set_short(&self, value: i16) -> Result<()> {
+    pub fn set_short(&self, value: i16) -> ZWaveResult<()> {
         if self.get_type() == ValueType::Short {
             let manager_ptr = unsafe { extern_manager::get() };
             res_to_result(unsafe {
@@ -628,7 +628,7 @@ impl ValueID {
         }
     }
 
-    pub fn set_string(&self, value: &str) -> Result<()> {
+    pub fn set_string(&self, value: &str) -> ZWaveResult<()> {
         // The underlying C++ lib accepts strings for all types
         let manager_ptr = unsafe { extern_manager::get() };
         let c_string = CString::new(value)?;
@@ -638,7 +638,7 @@ impl ValueID {
         .or(Err(Error::SetError(GetSetError::APIError("set_string"))))
     }
 
-    pub fn set_raw(&self, value: &Vec<u8>) -> Result<()> {
+    pub fn set_raw(&self, value: &Vec<u8>) -> ZWaveResult<()> {
         if self.get_type() == ValueType::Raw && value.len() < 256 {
             let manager_ptr = unsafe { extern_manager::get() };
             res_to_result(unsafe {
@@ -655,7 +655,7 @@ impl ValueID {
         }
     }
 
-    pub fn set_list_selection_string(&self, value: &str) -> Result<()> {
+    pub fn set_list_selection_string(&self, value: &str) -> ZWaveResult<()> {
         if self.get_type() == ValueType::List {
             let c_string = CString::new(value)?;
             let manager_ptr = unsafe { extern_manager::get() };
@@ -681,7 +681,7 @@ impl ValueID {
         })
     }
 
-    pub fn set_label(&self, str: &str) -> Result<()> {
+    pub fn set_label(&self, str: &str) -> ZWaveResult<()> {
         unsafe {
             let manager_ptr = extern_manager::get();
             let c_string = CString::new(str)?.as_ptr();
@@ -697,7 +697,7 @@ impl ValueID {
         })
     }
 
-    pub fn set_units(&self, str: &str) -> Result<()> {
+    pub fn set_units(&self, str: &str) -> ZWaveResult<()> {
         unsafe {
             let manager_ptr = extern_manager::get();
             let c_string = CString::new(str)?.as_ptr();
@@ -713,7 +713,7 @@ impl ValueID {
         })
     }
 
-    pub fn set_help(&self, str: &str) -> Result<()> {
+    pub fn set_help(&self, str: &str) -> ZWaveResult<()> {
         unsafe {
             let manager_ptr = extern_manager::get();
             let c_string = CString::new(str)?.as_ptr();
