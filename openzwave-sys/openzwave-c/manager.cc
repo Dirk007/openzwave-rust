@@ -146,7 +146,14 @@ uint8 manager_get_poll_intensity(Manager * manager, const ValueID *vid) {
 }
 
 char * manager_get_value_label(Manager * manager, const ValueID *vid, const RustStringCreator stringCreator) {
-  return stringCreator(manager->GetValueLabel(*vid).c_str());
+  // TODO: Sometimes this fails with obviously random vids...
+  std::string result = "";
+  try {
+    result = manager->GetValueLabel(*vid);
+  } catch (...) {
+    // NOP
+  }
+  return stringCreator(result.c_str());
 }
 
 void manager_set_value_label(Manager * manager, const ValueID *vid, char const * str) {
