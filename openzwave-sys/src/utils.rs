@@ -81,7 +81,7 @@ pub extern "C" fn rust_string_vec_creator(data: *const *const c_char, length: us
 #[macro_export]
 macro_rules! c_like_enum {
     ( $name: ident { $($variant: ident = $value: expr),+ } ) => {
-        #[derive(Debug, Clone, Copy)]
+        #[derive(Debug, Clone, Copy, PartialEq)]
         pub enum $name {
             $($variant = $value,)+
         }

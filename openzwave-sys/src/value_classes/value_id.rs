@@ -70,7 +70,7 @@ impl fmt::Display for ValueType {
 
 // IMPORTANT: This ValueID struct MUST match the layout of the OpenZWave
 //            ValueID class.
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(C)]
 pub struct ValueID {
     pub id: u32,

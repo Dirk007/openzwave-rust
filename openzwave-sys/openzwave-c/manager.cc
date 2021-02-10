@@ -162,7 +162,14 @@ void manager_set_value_label(Manager * manager, const ValueID *vid, char const *
 }
 
 char * manager_get_value_units(Manager * manager, const ValueID *vid, const RustStringCreator stringCreator) {
-  return stringCreator(manager->GetValueUnits(*vid).c_str());
+  // TODO: Sometimes this fails with obviously random vids...
+  std::string result = "";
+  try {
+    result = manager->GetValueUnits(*vid);
+  } catch (...) {
+    // NOP
+  }
+  return stringCreator(result.c_str());
 }
 
 void manager_set_value_units(Manager * manager, const ValueID *vid, char const * str) {

@@ -52,7 +52,7 @@ impl Notification {
                 0 => None,
                 _ => unsafe {
                         let ozw_vid = extern_notification::notification_get_value_id(ptr);
-                            if is_valid_value_id(ozw_vid) {
+                            if is_valid_value_id(ozw_vid) && notification_type != NotificationType::ValueRemoved {
                                 Some(ValueID::from_packed_id(home_id, ozw_vid))
                             } else {
                                 None
