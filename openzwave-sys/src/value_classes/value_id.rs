@@ -1,5 +1,7 @@
 use std::convert::{TryFrom};
 use std::fmt;
+#[cfg(feature = "serde_serialization")]
+use serde::{Serialize, Deserialize};
 
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -70,7 +72,8 @@ impl fmt::Display for ValueType {
 
 // IMPORTANT: This ValueID struct MUST match the layout of the OpenZWave
 //            ValueID class.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde_serialization", derive(Serialize, Deserialize))]
 #[repr(C)]
 pub struct ValueID {
     pub id: u32,

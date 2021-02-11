@@ -25,6 +25,7 @@ impl From<LogLevel> for i32 {
     
 }
 
+#[derive(Debug)]
 pub struct Options {
     ptr: *mut extern_options::Options
 }

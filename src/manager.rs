@@ -7,7 +7,6 @@ use crate::options::Options;
 use std::ffi::CString;
 use crate::value_classes::value_id::ValueID;
 
-#[allow(unused)]
 pub struct Manager {
     pub ptr: *mut extern_manager::Manager,
     options: Options,
@@ -21,7 +20,6 @@ pub trait NotificationWatcher: Sync {
     fn on_notification(&self, notification: &Notification);
 }
 
-#[allow(unused)]
 struct WatcherWrapper {
     watcher: Box<dyn NotificationWatcher>,
 }

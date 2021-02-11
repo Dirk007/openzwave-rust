@@ -11,6 +11,7 @@ use std::fmt;
 use std::ptr;
 
 pub use ffi::value_classes::value_id::{ValueGenre, ValueType};
+pub use extern_value_id::ValueID as ExternValueID;
 
 // Helper to have a correct representation with a fixed precision
 #[derive(Debug, Clone)]
