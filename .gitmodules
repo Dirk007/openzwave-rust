@@ -1,5 +1,0 @@
-[submodule "openzwave-sys/open-zwave"]
-	path = openzwave-sys/open-zwave
-  url = https://github.com/Dirk007/open-zwave.git
-  ignore = dirty
-  branch = apple_serial
