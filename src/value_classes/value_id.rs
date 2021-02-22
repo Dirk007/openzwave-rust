@@ -475,6 +475,11 @@ impl ValueID {
         }
     }
 
+    /// Return the big ID from the lib
+    pub fn id(&self) -> u64 {
+        (self.vid.id1 as u64) << 32 | (self.vid.id as u64)
+    }
+
     pub fn label(&self) -> &str {
         &self.label
     }

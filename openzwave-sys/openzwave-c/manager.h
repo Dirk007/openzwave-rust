@@ -20,6 +20,10 @@ void manager_reset_controller(Manager * manager, uint32 home_id);
 void manager_soft_reset_controller(Manager * manager, uint32 home_id);
 void manager_cancel_controller_command(Manager * manager, uint32 home_id);
 
+// Query functions
+bool manager_request_node_state(Manager * manager, uint32 const homeId, uint8 const nodeId);
+void manager_request_all_config_params(Manager * manager, uint32 const homeId, uint8 const nodeId);
+
 // Network functions
 bool manager_add_node(Manager * manager, uint32 home_id, bool secure);
 bool manager_remove_node(Manager * manager, uint32 home_id);

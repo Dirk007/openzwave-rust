@@ -16,6 +16,14 @@ void manager_destroy() {
   Manager::Destroy();
 }
 
+bool manager_request_node_state(Manager * manager, uint32 const homeId, uint8 const nodeId) {
+  return manager->RequestNodeState(homeId, nodeId);
+}
+
+void manager_request_all_config_params(Manager * manager, uint32 const homeId, uint8 const nodeId) {
+  manager->RequestAllConfigParams(homeId, nodeId);
+}
+
 void manager_cancel_controller_command(Manager * manager, uint32 home_id) {
   manager->CancelControllerCommand(home_id);
 }
