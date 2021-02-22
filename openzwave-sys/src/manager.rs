@@ -74,7 +74,9 @@ pub use self::{
     manager_node_is_security_device as is_node_security_device,
     manager_node_is_zwave_plus as is_node_zwave_plus, manager_remove_driver as remove_driver,
     manager_remove_node as remove_node, manager_remove_watcher as remove_watcher,
-    manager_reset_controller as reset_controller, manager_set_poll_intensity as set_poll_intensity,
+    manager_request_all_config_params as request_all_config_params,
+    manager_request_node_state as request_node_state, manager_reset_controller as reset_controller,
+    manager_set_poll_intensity as set_poll_intensity,
     manager_set_poll_interval as set_poll_interval, manager_set_value_bool as set_value_bool,
     manager_set_value_byte as set_value_byte, manager_set_value_float as set_value_float,
     manager_set_value_help as set_value_help, manager_set_value_int as set_value_int,
@@ -90,6 +92,8 @@ extern "C" {
     pub fn manager_create() -> *mut Manager;
     pub fn manager_get() -> *mut Manager;
     pub fn manager_destroy();
+    pub fn manager_request_node_state(manager: *mut Manager, home_id: u32, node_id: u8) -> bool;
+    pub fn manager_request_all_config_params(manager: *mut Manager, home_id: u32, node_id: u8);
     pub fn manager_reset_controller(manager: *mut Manager, home_id: u32);
     pub fn manager_soft_reset_controller(manager: *mut Manager, home_id: u32);
     pub fn manager_cancel_controller_command(manager: *mut Manager, home_id: u32);

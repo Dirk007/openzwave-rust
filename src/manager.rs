@@ -1,15 +1,17 @@
 use crate::error::{Error, Result};
-use ffi::manager as extern_manager;
-use ffi::utils::res_to_result;
-use libc::c_void;
 use crate::notification::{ExternNotification, Notification};
 use crate::options::Options;
-use std::ffi::CString;
 use crate::value_classes::value_id::ValueID;
+use ffi::manager as extern_manager;
+use ffi::utils as extern_utils;
+use ffi::utils::res_to_result;
+use libc::c_void;
+use std::ffi::CString;
 
 pub struct Manager {
     pub ptr: *mut extern_manager::Manager,
-    options: Options,
+    #[allow(dead_code)]
+    options: Options, //< this is a false positive
     watchers: Vec<Option<Box<WatcherWrapper>>>,
 }
 
@@ -47,16 +49,65 @@ impl Manager {
         }
     }
 
-    /* disable for now, we don't need this anywhere yet
-    pub fn get() -> Option<Manager> {
-        let external_manager = unsafe { extern_manager::manager_get() };
-        if external_manager.is_null() {
-            None
-        } else {
-            Some(Manager { ptr: external_manager, options: Options::get().unwrap() })
-        }
+    pub fn get_node_manufacturer_id(&self, home_id: u32, node_id: u8) -> String {
+        let raw = unsafe {
+            extern_manager::get_node_manufacturer_id(
+                self.ptr,
+                home_id,
+                node_id,
+                extern_utils::rust_string_creator,
+            )
+        };
+        extern_utils::recover_string(raw)
     }
-    */
+
+    pub fn get_node_manufacturer_name(&self, home_id: u32, node_id: u8) -> String {
+        let raw = unsafe {
+            extern_manager::get_node_manufacturer_name(
+                self.ptr,
+                home_id,
+                node_id,
+                extern_utils::rust_string_creator,
+            )
+        };
+        extern_utils::recover_string(raw)
+    }
+
+    pub fn get_node_product_id(&self, home_id: u32, node_id: u8) -> String {
+        let raw = unsafe {
+            extern_manager::get_node_product_id(
+                self.ptr,
+                home_id,
+                node_id,
+                extern_utils::rust_string_creator,
+            )
+        };
+        extern_utils::recover_string(raw)
+    }
+
+    pub fn get_node_product_name(&self, home_id: u32, node_id: u8) -> String {
+        let raw = unsafe {
+            extern_manager::get_node_product_name(
+                self.ptr,
+                home_id,
+                node_id,
+                extern_utils::rust_string_creator,
+            )
+        };
+        extern_utils::recover_string(raw)
+    }
+
+    pub fn set_value_byte(&self, vid: &ValueID, value: u8) -> bool {
+        unsafe { extern_manager::manager_set_value_byte(self.ptr, vid.vid(), value) }
+    }
+
+    pub fn request_node_state(&self, home_id: u32, node_id: u8) -> bool {
+        unsafe { extern_manager::manager_request_node_state(self.ptr, home_id, node_id) }
+    }
+
+    pub fn request_all_config_params(&self, home_id: u32, node_id: u8) {
+        unsafe { extern_manager::manager_request_all_config_params(self.ptr, home_id, node_id) }
+    }
 
     pub fn reset_controller(&self, home_id: u32) {
         unsafe {
@@ -212,11 +263,7 @@ impl Manager {
 
     pub fn enable_poll_with_intensity(&self, vid: &ValueID, intensity: u8) -> bool {
         unsafe {
-            extern_manager::manager_enable_poll_with_intensity(
-                self.ptr,
-                vid.vid(),
-                intensity,
-            )
+            extern_manager::manager_enable_poll_with_intensity(self.ptr, vid.vid(), intensity)
         }
     }
 
@@ -233,9 +280,7 @@ impl Manager {
     }
 
     pub fn set_poll_intensity(&self, vid: &ValueID, intensity: u8) {
-        unsafe {
-            extern_manager::manager_set_poll_intensity(self.ptr, vid.vid(), intensity)
-        }
+        unsafe { extern_manager::manager_set_poll_intensity(self.ptr, vid.vid(), intensity) }
     }
 
     pub fn get_poll_intensity(&self, vid: &ValueID) -> u8 {
